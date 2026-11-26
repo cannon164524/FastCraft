@@ -37,4 +37,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "v1.0.${{ github.run_number }}"
-          gh release create $tag "dist/FastCraft.exe" --title "FastCraft 1.0.${{ github.run_number }}" --notes "Automatic build of commit ${{ github.sha }}." --latest
+          # What's new is the commits since the previous release, so the update window
+          # can show the changes instead of a build stamp.
+          $previous = gh release view --json tagName -q .tagName 2>$null
+          if ($previous) {
+              $commits = @(git log "$previous..HEAD" --no-merges --pretty=format:"- %s")
+          } else {
+              $commits = @(git log -5 --no-merges --pretty=format:"- %s")
+          }
+          if ($commits.Count -eq 0) { $commits = @("- No changes were recorded for this build.") }
+          $notes = $commits -join "`n"
+          gh release create $tag "dist/FastCraft.exe" --title "FastCraft 1.0.${{ github.run_number }}" --notes $notes --latest

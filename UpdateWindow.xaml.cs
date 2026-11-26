@@ -16,8 +16,9 @@ namespace FastCraft
         {
             InitializeComponent();
             _info = info;
-            VersionText.Text = "You have " + UpdateService.CurrentVersion + "; the latest is " + info.Tag + ".";
-            NotesBox.Text = string.IsNullOrEmpty(info.Notes) ? "No release notes were published." : info.Notes;
+            VersionText.Text = UpdateService.DisplayTag(info.Tag) + " is ready. You have "
+                              + UpdateService.ShortVersion(UpdateService.CurrentVersion) + ".";
+            NotesText.Text = string.IsNullOrEmpty(info.Notes) ? "No notes were written for this build." : info.Notes;
         }
 
         private async void UpdateButton_Click(object sender, RoutedEventArgs e)

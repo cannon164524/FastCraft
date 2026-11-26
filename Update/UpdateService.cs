@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,8 +19,11 @@ namespace FastCraft.Update
     /// </summary>
     public sealed class UpdateService
     {
-        private const string ReleasesUrl = "https://api.github.com/repos/cannon164524/FastCraft/releases/latest";
+        // The releases list, not just the latest one: a player who is several builds behind sees
+        // the changes of every release between the one they run and the newest.
+        private const string ReleasesUrl = "https://api.github.com/repos/cannon164524/FastCraft/releases?per_page=20";
         private const string AssetName = "FastCraft.exe";
+        private const string PlaceholderNotes = "Automatic build of commit";
 
         public static Version CurrentVersion
         {
@@ -67,22 +72,30 @@ namespace FastCraft.Update
                         }
 
                         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                        var latest = Parse(body);
-                        if (latest == null)
+                        var releases = ParseReleases(body);
+                        if (releases.Count == 0)
                         {
                             result.Failed = true;
-                            result.Message = "GitHub's latest release has no version tag or no FastCraft.exe asset.";
+                            result.Message = "GitHub's releases have no version tag or no FastCraft.exe asset.";
                             return result;
                         }
 
-                        if (latest.Version.CompareTo(CurrentVersion) <= 0)
+                        var newer = new List<UpdateInfo>();
+                        foreach (var release in releases)
                         {
-                            result.Message = "FastCraft " + CurrentVersion + " is up to date (latest release: " + latest.Tag + ").";
+                            if (release.Version.CompareTo(CurrentVersion) > 0) newer.Add(release);
+                        }
+
+                        if (newer.Count == 0)
+                        {
+                            result.Message = "FastCraft " + ShortVersion(CurrentVersion) + " is up to date (latest release: " + releases[0].Tag + ").";
                             return result;
                         }
 
+                        var latest = newer[0];
+                        latest.Notes = BuildNotes(newer);
                         result.Info = latest;
-                        result.Message = "FastCraft " + latest.Tag + " is available (you have " + CurrentVersion + ").";
+                        result.Message = "FastCraft " + latest.Tag + " is available (you have " + ShortVersion(CurrentVersion) + ").";
                         return result;
                     }
                 }
@@ -111,42 +124,124 @@ namespace FastCraft.Update
             return "";
         }
 
-        private static UpdateInfo Parse(string json)
+        private static List<UpdateInfo> ParseReleases(string json)
         {
+            var releases = new List<UpdateInfo>();
             using (var document = JsonDocument.Parse(json))
             {
-                var root = document.RootElement;
-                if (JsonHelp.GetBool(root, "draft")) return null;
-
-                var tag = JsonHelp.GetString(root, "tag_name");
-                if (string.IsNullOrEmpty(tag)) return null;
-
-                Version version;
-                if (!TryParseVersion(tag, out version)) return null;
-
-                var info = new UpdateInfo
+                if (document.RootElement.ValueKind != JsonValueKind.Array) return releases;
+                foreach (var element in document.RootElement.EnumerateArray())
                 {
-                    Tag = tag,
-                    Version = version,
-                    Notes = JsonHelp.GetString(root, "body") ?? ""
-                };
+                    var release = ParseRelease(element);
+                    if (release != null) releases.Add(release);
+                }
+            }
 
-                JsonElement assets;
-                if (root.TryGetProperty("assets", out assets) && assets.ValueKind == JsonValueKind.Array)
+            releases.Sort(delegate(UpdateInfo left, UpdateInfo right)
+            {
+                return right.Version.CompareTo(left.Version);
+            });
+            return releases;
+        }
+
+        private static UpdateInfo ParseRelease(JsonElement release)
+        {
+            if (release.ValueKind != JsonValueKind.Object) return null;
+            if (JsonHelp.GetBool(release, "draft")) return null;
+            if (JsonHelp.GetBool(release, "prerelease")) return null;
+
+            var tag = JsonHelp.GetString(release, "tag_name");
+            Version version;
+            if (!TryParseVersion(tag, out version)) return null;
+
+            var info = new UpdateInfo
+            {
+                Tag = tag,
+                Version = version,
+                Notes = CleanNotes(JsonHelp.GetString(release, "body"))
+            };
+
+            var published = JsonHelp.GetString(release, "published_at");
+            DateTime publishedAt;
+            if (published != null && DateTime.TryParse(published, out publishedAt))
+            {
+                info.PublishedAt = publishedAt;
+            }
+
+            JsonElement assets;
+            if (release.TryGetProperty("assets", out assets) && assets.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var asset in assets.EnumerateArray())
                 {
-                    foreach (var asset in assets.EnumerateArray())
+                    var name = JsonHelp.GetString(asset, "name");
+                    if (!string.Equals(name, AssetName, StringComparison.OrdinalIgnoreCase)) continue;
+                    info.Url = JsonHelp.GetString(asset, "browser_download_url");
+                    info.Size = JsonHelp.GetLong(asset, "size");
+                    break;
+                }
+            }
+
+            return string.IsNullOrEmpty(info.Url) ? null : info;
+        }
+
+        /// <summary>
+        /// The text of a release. Older builds carry "Automatic build of commit …" instead of
+        /// notes; that is no note at all, so it is dropped.
+        /// </summary>
+        private static string CleanNotes(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return "";
+            var text = body.Replace("\r\n", "\n").Trim();
+            if (text.StartsWith(PlaceholderNotes, StringComparison.OrdinalIgnoreCase)) return "";
+            return text;
+        }
+
+        /// <summary>
+        /// What's new, release by release, newest first, so a player several builds behind sees
+        /// everything that changed instead of only the newest build.
+        /// </summary>
+        private static string BuildNotes(List<UpdateInfo> newer)
+        {
+            var builder = new StringBuilder();
+            var single = newer.Count == 1;
+
+            foreach (var release in newer)
+            {
+                if (builder.Length > 0) builder.Append("\n\n");
+
+                // With more than one build waiting, each release gets its own heading.
+                if (!single)
+                {
+                    builder.Append(DisplayTag(release.Tag));
+                    if (release.PublishedAt.HasValue)
                     {
-                        var name = JsonHelp.GetString(asset, "name");
-                        if (!string.Equals(name, AssetName, StringComparison.OrdinalIgnoreCase)) continue;
-                        info.Url = JsonHelp.GetString(asset, "browser_download_url");
-                        info.Size = JsonHelp.GetLong(asset, "size");
-                        break;
+                        builder.Append("   ·   ").Append(release.PublishedAt.Value.ToLocalTime().ToString("d MMM yyyy"));
                     }
+                    builder.Append('\n');
                 }
 
-                if (string.IsNullOrEmpty(info.Url)) return null;
-                return info;
+                if (string.IsNullOrEmpty(release.Notes))
+                {
+                    builder.Append("- No notes were written for this build.");
+                }
+                else
+                {
+                    builder.Append(release.Notes);
+                }
             }
+            return builder.ToString();
+        }
+
+        public static string DisplayTag(string tag)
+        {
+            if (string.IsNullOrEmpty(tag)) return "";
+            return tag.TrimStart('v', 'V');
+        }
+
+        public static string ShortVersion(Version version)
+        {
+            if (version == null) return "";
+            return version.Major + "." + version.Minor + "." + version.Build;
         }
 
         public static bool TryParseVersion(string tag, out Version version)

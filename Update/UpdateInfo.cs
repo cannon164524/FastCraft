@@ -12,6 +12,7 @@ namespace FastCraft.Update
         public string Url;
         public long Size;
         public string Notes;
+        public DateTime? PublishedAt;
     }
 
     /// <summary>

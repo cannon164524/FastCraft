@@ -191,8 +191,10 @@ That file is what to include in a bug report; the window title shows the version
 ## Updates
 
 Every push to `main` builds FastCraft and publishes it as a GitHub release (`v1.0.<build number>`, with
-`FastCraft.exe` attached). An installed FastCraft checks that release on start; when it is newer, a window
-pops up with the versions, the release notes and an **Update now** button. The new exe is downloaded to
+`FastCraft.exe` attached). **The release notes are the commit subjects since the previous release**, so what
+you read in the pop-up is what changed. An installed FastCraft checks that release on start; when it is newer,
+a window pops up with the versions, those notes and an **Update now** button. If you are several builds behind,
+every release between yours and the newest is listed, newest first, with its date. The new exe is downloaded to
 `%APPDATA%\FastCraft\update\FastCraft.exe`, FastCraft restarts, and a small helper script replaces the old
 exe with it.
 
