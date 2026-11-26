@@ -9,6 +9,12 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>FastCraft</AssemblyName>
     <RootNamespace>FastCraft</RootNamespace>
+    <StartupObject>FastCraft.Program</StartupObject>
+    <!-- WPF needs its native DLLs (PresentationNative, D3DCompiler, …). Bundle them into
+         the exe, otherwise the published "single file" is only one of many files and the
+         app exits silently when started on its own. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
     <Version>1.0.0</Version>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <InvariantGlobalization>false</InvariantGlobalization>

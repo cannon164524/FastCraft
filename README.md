@@ -43,6 +43,16 @@ Pick one:
 `dist\FastCraft.exe` is self-contained: copy it anywhere, double-click it, and it runs without .NET installed.
 `build-exe.bat` and the Actions workflow run the same command.
 
+## If nothing happens when you double-click FastCraft.exe
+
+- Use the exe from the **latest** build. Earlier builds uploaded only `FastCraft.exe` while the WPF
+  runtime DLLs were left beside it, so the exe could not start. Now everything is bundled into the one file.
+- FastCraft writes the reason for a failed start to `%APPDATA%\FastCraft\startup.log` and also shows it
+  in a message box. If that log does not exist at all, Windows stopped the exe before it ran (see below).
+- To see the exit code: open PowerShell in the exe's folder and run `& .\FastCraft.exe; $LASTEXITCODE`.
+- An unsigned exe downloaded from the internet can be blocked by Windows: right-click the exe →
+  *Properties* → tick *Unblock*, or in the SmartScreen prompt choose *More info* → *Run anyway*.
+
 ## Requirements
 
 - Windows 10 or 11, 64-bit.

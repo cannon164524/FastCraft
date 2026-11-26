@@ -21,4 +21,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: FastCraft-windows-x64
-          path: dist/FastCraft.exe
+          path: dist/
