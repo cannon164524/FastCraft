@@ -18,6 +18,11 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Draw the app icon
+        shell: pwsh
+        continue-on-error: true
+        run: pwsh -NoProfile -File tools/make-icon.ps1 -Out Assets/FastCraft.ico
+
       - name: Publish FastCraft.exe
         run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:ReadyToRun=true -p:Version=1.0.${{ github.run_number }} -o dist
 

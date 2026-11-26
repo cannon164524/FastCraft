@@ -7,6 +7,31 @@ Microsoft account that actually **owns** Minecraft: Java Edition — the ownersh
 FastCraft never fakes a session. For single player there is an **offline profile** (a local nickname), which is what
 you use while Microsoft's sign-in is unavailable; it cannot join online servers or Realms.
 
+## The interface
+
+One window, no tabs inside tabs: a 228 px rail with four views — **Play**, **Versions**, **Settings**, **Logs** —
+the account card pinned to its bottom, and a status strip along the bottom edge that says what the launcher is
+doing.
+
+- **One accent, no gradients.** Charcoal surfaces, hairline borders, one amber accent (`#D9A55B`) used only for the
+  primary action, the selection marker and the icon; everything else is text in three weights.
+- **The version you are about to launch is the headline** of the Play view — name at 32 px, build type underneath —
+  instead of a drop-down buried in a toolbar. Choosing one happens in the Versions list.
+- **Motion where it means something:** a page change fades in and rises 12 px over 240 ms; buttons sink 1.5 % when
+  pressed and put an 8 % glow under the cursor in 120 ms; the checkbox mark and the selection bars fade in; the
+  progress bar animates between its 200 ms samples instead of jumping.
+- **Its own window chrome** (`WindowChrome`, 46 px caption, drawn minimise/maximise/close), so the launcher does not
+  wear Windows 10's title bar on Windows 11.
+
+## The icon
+
+The mark is two speed chevrons in a dark rounded tile. It is drawn once as a `DrawingImage` in `App.xaml` and reused
+for the title bar, the watermark on the Play view and the window/taskbar icon (rasterised at runtime).
+
+`tools/make-icon.ps1` draws the same shapes with GDI+ and writes `Assets\FastCraft.ico` in seven sizes (16–256,
+PNG-compressed entries). The CI workflow and `build-exe.bat` run it before publishing, and `FastCraft.csproj` only
+uses the file when it exists — a build without PowerShell still works, it just keeps the default exe icon.
+
 ## Why it is fast
 
 - **Native .NET / WPF app.** No Electron, no embedded browser: the window is up in well under a second.

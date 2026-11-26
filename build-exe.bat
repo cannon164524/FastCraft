@@ -14,6 +14,11 @@ if errorlevel 1 (
 )
 
 echo.
+echo   Drawing the app icon ...
+if exist "%~dp0tools\make-icon.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\make-icon.ps1" -Out "%~dp0Assets\FastCraft.ico"
+)
+
 echo   Building FastCraft.exe ...
 echo.
 

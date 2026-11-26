@@ -5,6 +5,10 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FastCraft.Auth;
 using FastCraft.Core;
@@ -37,6 +41,8 @@ namespace FastCraft
         {
             InitializeComponent();
             Title = "FastCraft " + UpdateService.CurrentVersion;
+            TitleVersion.Text = UpdateService.CurrentVersion;
+            Icon = BuildWindowIcon();
 
             Locations.Ensure();
             _settings = Settings.Load(Locations.SettingsPath);
@@ -136,7 +142,7 @@ namespace FastCraft
             LaunchButton.IsEnabled = !busy;
             SignInButton.IsEnabled = !busy;
             RefreshVersionsButton.IsEnabled = !busy;
-            VersionCombo.IsEnabled = !busy;
+            VersionList.IsEnabled = !busy;
             SnapshotsCheck.IsEnabled = !busy;
             CancelButton.IsEnabled = busy;
             if (!string.IsNullOrEmpty(status)) StatusText.Text = status;
@@ -166,7 +172,7 @@ namespace FastCraft
             if (_manifest == null) return;
 
             var showSnapshots = SnapshotsCheck.IsChecked == true;
-            var selected = VersionCombo.SelectedItem as string;
+            var selected = VersionList.SelectedItem as string;
             if (string.IsNullOrEmpty(selected)) selected = _settings.LastVersion;
 
             var versions = new List<VersionSummary>();
@@ -179,25 +185,26 @@ namespace FastCraft
 
             var ids = new List<string>();
             foreach (var version in versions) ids.Add(version.Id);
-            VersionCombo.ItemsSource = ids;
+            VersionList.ItemsSource = ids;
 
             if (!string.IsNullOrEmpty(selected) && ids.Contains(selected))
             {
-                VersionCombo.SelectedItem = selected;
+                VersionList.SelectedItem = selected;
             }
             else if (!string.IsNullOrEmpty(_manifest.LatestRelease) && ids.Contains(_manifest.LatestRelease))
             {
-                VersionCombo.SelectedItem = _manifest.LatestRelease;
+                VersionList.SelectedItem = _manifest.LatestRelease;
             }
             else if (ids.Count > 0)
             {
-                VersionCombo.SelectedIndex = 0;
+                VersionList.SelectedIndex = 0;
             }
+            UpdateHero();
         }
 
         private VersionSummary SelectedVersion()
         {
-            var id = VersionCombo.SelectedItem as string;
+            var id = VersionList.SelectedItem as string;
             if (string.IsNullOrEmpty(id)) return null;
             foreach (var version in _shownVersions)
             {
@@ -218,6 +225,137 @@ namespace FastCraft
                 AccountText.Text = "Signed in as " + _account.Name;
                 SignOutButton.IsEnabled = true;
             }
+        }
+
+        // ------------------------------------------------------------- window chrome
+
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void Maximize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        /// <summary>
+        /// The window and taskbar icon, drawn from the same shapes as the mark in App.xaml, so the
+        /// launcher looks finished without shipping a bitmap. The exe's own icon comes from
+        /// Assets\FastCraft.ico, which tools/make-icon.ps1 writes during the build.
+        /// </summary>
+        private static ImageSource BuildWindowIcon()
+        {
+            var group = new DrawingGroup();
+            using (var context = group.Open())
+            {
+                var tile = new SolidColorBrush(Color.FromRgb(0x1C, 0x22, 0x2B));
+                var edge = new Pen(new SolidColorBrush(Color.FromRgb(0x2C, 0x35, 0x42)), 1);
+                context.DrawRoundedRectangle(tile, edge, new Rect(1, 1, 22, 22), 5.5, 5.5);
+
+                var front = new Pen(new SolidColorBrush(Color.FromRgb(0xD9, 0xA5, 0x5B)), 2.1)
+                {
+                    StartLineCap = PenLineCap.Round,
+                    EndLineCap = PenLineCap.Round,
+                    LineJoin = PenLineJoin.Round
+                };
+                context.DrawGeometry(null, front, Geometry.Parse("M 8,7 L 12.6,12 L 8,17"));
+
+                var back = new Pen(new SolidColorBrush(Color.FromRgb(0x8C, 0x6E, 0x43)), 2.1)
+                {
+                    StartLineCap = PenLineCap.Round,
+                    EndLineCap = PenLineCap.Round,
+                    LineJoin = PenLineJoin.Round
+                };
+                context.DrawGeometry(null, back, Geometry.Parse("M 13.2,7 L 17.8,12 L 13.2,17"));
+            }
+            group.Freeze();
+
+            var visual = new DrawingVisual();
+            using (var context = visual.RenderOpen())
+            {
+                context.PushTransform(new ScaleTransform(64.0 / 24.0, 64.0 / 24.0));
+                context.DrawDrawing(group);
+            }
+            var bitmap = new RenderTargetBitmap(64, 64, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(visual);
+            bitmap.Freeze();
+            return bitmap;
+        }
+
+        // ---------------------------------------------------------------- navigation
+
+        private void Nav_Checked(object sender, RoutedEventArgs e)
+        {
+            if (PageHost == null) return;
+            var radio = sender as RadioButton;
+            if (radio == null) return;
+            ShowPage(radio.Tag as string ?? "play");
+        }
+
+        private void ShowPage(string tag)
+        {
+            var page = PlayPage;
+            if (tag == "versions") page = VersionsPage;
+            else if (tag == "settings") page = SettingsPage;
+            else if (tag == "log") page = LogPage;
+            if (page == null) return;
+
+            var pages = new Grid[] { PlayPage, VersionsPage, SettingsPage, LogPage };
+            foreach (var candidate in pages)
+            {
+                if (candidate == null || candidate == page) continue;
+                candidate.Visibility = Visibility.Collapsed;
+            }
+
+            page.Visibility = Visibility.Visible;
+            page.Opacity = 0;
+            var slide = new TranslateTransform(0, 12);
+            page.RenderTransform = slide;
+
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var duration = new Duration(TimeSpan.FromMilliseconds(240));
+            page.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
+            slide.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(12, 0, duration) { EasingFunction = ease });
+        }
+
+        private void VersionList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateHero();
+        }
+
+        private void UpdateHero()
+        {
+            if (VersionHero == null) return;
+            var summary = SelectedVersion();
+            if (summary == null)
+            {
+                VersionHero.Text = "—";
+                VersionMeta.Text = "No version selected";
+                return;
+            }
+            VersionHero.Text = summary.Id;
+            VersionMeta.Text = summary.Type == "snapshot" ? "Snapshot build" : "Release build";
+        }
+
+        /// <summary>
+        /// The progress bar follows the download count in 200 ms steps; animating the value
+        /// instead of assigning it turns those steps into a smooth sweep.
+        /// </summary>
+        private void SetProgress(double value)
+        {
+            var target = Math.Min(1.0, Math.Max(0.0, value));
+            Progress.BeginAnimation(System.Windows.Controls.Primitives.RangeBase.ValueProperty,
+                new DoubleAnimation(target, new Duration(TimeSpan.FromMilliseconds(180)))
+                {
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                });
         }
 
         private async Task CheckForUpdatesAsync(bool manual)
@@ -558,11 +696,11 @@ namespace FastCraft
             int done = _downloader.Done;
             if (total <= 0)
             {
-                Progress.Value = 0;
+                SetProgress(0);
                 return;
             }
             var ratio = (double)done / total;
-            Progress.Value = Math.Min(1.0, Math.Max(0.0, ratio));
+            SetProgress(ratio);
 
             var megabytes = _downloader.Bytes / (1024.0 * 1024.0);
             StatusText.Text = done + "/" + total + " files, " + megabytes.ToString("0.0") + " MB downloaded, "

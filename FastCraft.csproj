@@ -16,6 +16,10 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <DebugType>none</DebugType>
     <Version>1.0.0</Version>
+    <!-- The exe icon is drawn by tools/make-icon.ps1, which the CI workflow and
+         build-exe.bat run before publishing. Without the file the build still works,
+         just with the default Windows icon. -->
+    <ApplicationIcon Condition="Exists('Assets\FastCraft.ico')">Assets\FastCraft.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>

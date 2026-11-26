@@ -2,3 +2,7 @@ bin/
 obj/
 .vs/
 *.user
+
+
+# drawn by tools/make-icon.ps1 during a build
+Assets/FastCraft.ico
