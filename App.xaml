@@ -4,22 +4,35 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 
-        <!-- ============================ palette ============================
-             One accent, three surfaces, four text weights. No gradients: the
-             launcher should read as a tool, not as a game menu. -->
-        <SolidColorBrush x:Key="Brush.Bg" Color="#0F1216"/>
-        <SolidColorBrush x:Key="Brush.Sidebar" Color="#12161C"/>
-        <SolidColorBrush x:Key="Brush.Surface" Color="#171C23"/>
-        <SolidColorBrush x:Key="Brush.SurfaceAlt" Color="#1C222B"/>
-        <SolidColorBrush x:Key="Brush.Line" Color="#242C37"/>
-        <SolidColorBrush x:Key="Brush.Text" Color="#E6EBF2"/>
-        <SolidColorBrush x:Key="Brush.TextDim" Color="#96A1B0"/>
-        <SolidColorBrush x:Key="Brush.TextFaint" Color="#5E6A79"/>
+        <!-- palette
+             Near black surfaces, one hot accent, and a violet only for the ambient
+             light behind the pages. Cards are translucent so that light bleeds
+             through them instead of sitting on top like a decal. -->
+        <SolidColorBrush x:Key="Brush.Bg" Color="#07090D"/>
+        <SolidColorBrush x:Key="Brush.Sidebar" Color="#0A0D13"/>
+        <SolidColorBrush x:Key="Brush.Surface" Color="#E0111720"/>
+        <SolidColorBrush x:Key="Brush.SurfaceAlt" Color="#EA1A222E"/>
+        <SolidColorBrush x:Key="Brush.Line" Color="#27303D"/>
+        <SolidColorBrush x:Key="Brush.Text" Color="#EDF2F9"/>
+        <SolidColorBrush x:Key="Brush.TextDim" Color="#97A4B7"/>
+        <SolidColorBrush x:Key="Brush.TextFaint" Color="#5E6C7F"/>
         <SolidColorBrush x:Key="Brush.Accent" Color="#D9A55B"/>
-        <SolidColorBrush x:Key="Brush.Warn" Color="#C8A15E"/>
-        <SolidColorBrush x:Key="Brush.Danger" Color="#C0554F"/>
+        <SolidColorBrush x:Key="Brush.Warn" Color="#E8B36A"/>
+        <SolidColorBrush x:Key="Brush.Danger" Color="#FF5C57"/>
 
-        <!-- =========================== the mark ===========================
+        <!-- the accent as light: everything that glows uses one of these -->
+        <LinearGradientBrush x:Key="Brush.AccentGrad" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#FFD79A" Offset="0"/>
+            <GradientStop Color="#D98B3F" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="Brush.HeroText" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFFFFF" Offset="0"/>
+            <GradientStop Color="#FFE0B4" Offset="0.55"/>
+            <GradientStop Color="#E8A560" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- the mark
              A dark tile and two speed chevrons. The same shapes are drawn by
              tools/make-icon.ps1 for the exe icon, and rasterised at runtime
              for the window and taskbar. -->
@@ -51,7 +64,7 @@
             </DrawingImage.Drawing>
         </DrawingImage>
 
-        <!-- ============================ text ============================== -->
+        <!-- text -->
         <Style x:Key="Text.Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource Brush.TextFaint}"/>
             <Setter Property="FontSize" Value="10.5"/>
@@ -64,10 +77,13 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
 
-        <!-- =========================== buttons ============================ -->
+        <!-- buttons
+             Every button carries a blurred accent halo that lights up under the
+             pointer, and presses squash it with an elastic release. -->
         <Style x:Key="Button.Base" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource Brush.SurfaceAlt}"/>
             <Setter Property="Foreground" Value="{StaticResource Brush.Text}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="16,8"/>
             <Setter Property="FontSize" Value="12.5"/>
@@ -80,13 +96,23 @@
                     <ControlTemplate TargetType="Button">
                         <Grid Background="Transparent" RenderTransformOrigin="0.5,0.5">
                             <Grid.RenderTransform>
-                                <ScaleTransform x:Name="Scale" ScaleX="1" ScaleY="1"/>
+                                <ScaleTransform x:Name="Press" ScaleX="1" ScaleY="1"/>
                             </Grid.RenderTransform>
-                            <Border x:Name="Fill" Background="{TemplateBinding Background}"
+
+                            <Border x:Name="Halo" Margin="-2" CornerRadius="14" Opacity="0" IsHitTestVisible="False">
+                                <Border.Background>
+                                    <SolidColorBrush Color="#FFC077"/>
+                                </Border.Background>
+                                <Border.Effect>
+                                    <BlurEffect Radius="15"/>
+                                </Border.Effect>
+                            </Border>
+
+                            <Border x:Name="Fill" CornerRadius="9"
+                                    Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="8"/>
-                            <Border x:Name="Glow" Background="#FFFFFF" Opacity="0" CornerRadius="8"/>
+                                    BorderThickness="{TemplateBinding BorderThickness}"/>
+
                             <ContentPresenter Margin="{TemplateBinding Padding}"
                                               HorizontalAlignment="Center" VerticalAlignment="Center"
                                               RecognizesAccessKey="True"/>
@@ -96,16 +122,16 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity"
-                                                             To="0.08" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                                                             To="0.18" Duration="0:0:0.16"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.18"/>
+                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.34"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -114,20 +140,28 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Scale" Storyboard.TargetProperty="ScaleX"
-                                                             To="0.985" Duration="0:0:0.07"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale" Storyboard.TargetProperty="ScaleY"
-                                                             To="0.985" Duration="0:0:0.07"/>
+                                            <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleX"
+                                                             To="0.96" Duration="0:0:0.07"/>
+                                            <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleY"
+                                                             To="0.96" Duration="0:0:0.07"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Scale" Storyboard.TargetProperty="ScaleX"
-                                                             To="1" Duration="0:0:0.16"/>
-                                            <DoubleAnimation Storyboard.TargetName="Scale" Storyboard.TargetProperty="ScaleY"
-                                                             To="1" Duration="0:0:0.16"/>
+                                            <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleX"
+                                                             To="1" Duration="0:0:0.42">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <ElasticEase EasingMode="EaseOut" Oscillations="2" Springiness="7"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleY"
+                                                             To="1" Duration="0:0:0.42">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <ElasticEase EasingMode="EaseOut" Oscillations="2" Springiness="7"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -137,7 +171,7 @@
                                 <Setter TargetName="Fill" Property="BorderThickness" Value="1"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.4"/>
+                                <Setter Property="Opacity" Value="0.35"/>
                                 <Setter Property="Cursor" Value="Arrow"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -148,15 +182,156 @@
 
         <Style TargetType="Button" BasedOn="{StaticResource Button.Base}"/>
 
-        <Style x:Key="Button.Primary" TargetType="Button" BasedOn="{StaticResource Button.Base}">
-            <Setter Property="Background" Value="{StaticResource Brush.Accent}"/>
-            <Setter Property="Foreground" Value="#12161C"/>
-            <Setter Property="Padding" Value="26,13"/>
+        <!-- the primary action: a lit slab that breathes while it waits -->
+        <Style x:Key="Button.Primary" TargetType="Button">
+            <Setter Property="Foreground" Value="#150E06"/>
             <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="30,15"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <ScaleTransform x:Name="Press" ScaleX="1" ScaleY="1"/>
+                            </Grid.RenderTransform>
+
+                            <Border x:Name="Halo" Margin="-5" CornerRadius="20" Opacity="0.5"
+                                    RenderTransformOrigin="0.5,0.5" IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#FFC077" Offset="0"/>
+                                        <GradientStop Color="#D9663A" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <Border.Effect>
+                                    <BlurEffect Radius="22"/>
+                                </Border.Effect>
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="HaloScale" ScaleX="1" ScaleY="1"/>
+                                </Border.RenderTransform>
+                            </Border>
+
+                            <Border x:Name="Face" CornerRadius="11" ClipToBounds="True">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#FFD79A" Offset="0"/>
+                                        <GradientStop Color="#D9863B" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <Grid>
+                                    <Border x:Name="Sheen" Width="70" HorizontalAlignment="Left"
+                                            Opacity="0" IsHitTestVisible="False">
+                                        <Border.RenderTransform>
+                                            <TranslateTransform X="-150"/>
+                                        </Border.RenderTransform>
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                <GradientStop Color="#00FFFFFF" Offset="0"/>
+                                                <GradientStop Color="#B3FFFFFF" Offset="0.5"/>
+                                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="HaloScale" Storyboard.TargetProperty="ScaleX"
+                                                         From="0.99" To="1.03" Duration="0:0:2.4"
+                                                         AutoReverse="True" RepeatBehavior="Forever">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseInOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="HaloScale" Storyboard.TargetProperty="ScaleY"
+                                                         From="0.97" To="1.08" Duration="0:0:2.4"
+                                                         AutoReverse="True" RepeatBehavior="Forever">
+                                            <DoubleAnimation.EasingFunction>
+                                                <SineEase EasingMode="EaseInOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                                                             To="0.95" Duration="0:0:0.2"/>
+                                            <DoubleAnimation Storyboard.TargetName="Sheen"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                             From="-150" To="420" Duration="0:0:0.8"/>
+                                            <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Sheen"
+                                                                           Storyboard.TargetProperty="Opacity">
+                                                <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:0.18" Value="0.6"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:0.7" Value="0"/>
+                                            </DoubleAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                                                             To="0.5" Duration="0:0:0.5"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleX"
+                                                             To="0.97" Duration="0:0:0.08"/>
+                                            <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleY"
+                                                             To="0.97" Duration="0:0:0.08"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleX"
+                                                             To="1" Duration="0:0:0.5">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <ElasticEase EasingMode="EaseOut" Oscillations="2" Springiness="6"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="Press" Storyboard.TargetProperty="ScaleY"
+                                                             To="1" Duration="0:0:0.5">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <ElasticEase EasingMode="EaseOut" Oscillations="2" Springiness="6"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.32"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="Button.Ghost" TargetType="Button" BasedOn="{StaticResource Button.Base}">
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="#0DFFFFFF"/>
             <Setter Property="Foreground" Value="{StaticResource Brush.TextDim}"/>
             <Setter Property="BorderBrush" Value="{StaticResource Brush.Line}"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -173,8 +348,12 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid Background="Transparent">
-                            <Border x:Name="Fill" Background="{TemplateBinding Background}" CornerRadius="6"/>
-                            <Border x:Name="Glow" Background="#FFFFFF" Opacity="0" CornerRadius="6"/>
+                            <Border x:Name="Fill" Background="{TemplateBinding Background}" CornerRadius="7"/>
+                            <Border x:Name="Glow" Background="#FFC077" Opacity="0" CornerRadius="7">
+                                <Border.Effect>
+                                    <BlurEffect Radius="10"/>
+                                </Border.Effect>
+                            </Border>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -183,7 +362,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity"
-                                                             To="0.07" Duration="0:0:0.1"/>
+                                                             To="0.16" Duration="0:0:0.12"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -191,7 +370,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.16"/>
+                                                             To="0" Duration="0:0:0.2"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -207,8 +386,12 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid Background="Transparent">
-                            <Border x:Name="Fill" Background="Transparent" CornerRadius="6"/>
-                            <Border x:Name="Red" Background="{StaticResource Brush.Danger}" Opacity="0" CornerRadius="6"/>
+                            <Border x:Name="Red" Background="{StaticResource Brush.Danger}" Opacity="0" CornerRadius="7">
+                                <Border.Effect>
+                                    <BlurEffect Radius="14"/>
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="Face" Background="{StaticResource Brush.Danger}" Opacity="0" CornerRadius="7"/>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -216,16 +399,20 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Face" Storyboard.TargetProperty="Opacity"
+                                                             To="0.9" Duration="0:0:0.14"/>
                                             <DoubleAnimation Storyboard.TargetName="Red" Storyboard.TargetProperty="Opacity"
-                                                             To="0.85" Duration="0:0:0.12"/>
+                                                             To="0.75" Duration="0:0:0.14"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Face" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.24"/>
                                             <DoubleAnimation Storyboard.TargetName="Red" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.16"/>
+                                                             To="0" Duration="0:0:0.24"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -236,24 +423,45 @@
             </Setter>
         </Style>
 
-        <!-- ========================== navigation ========================== -->
+        <!-- navigation: the selected item grows a glowing bar and its dot blooms -->
         <Style x:Key="Nav.Item" TargetType="RadioButton">
             <Setter Property="Foreground" Value="{StaticResource Brush.TextDim}"/>
             <Setter Property="FontSize" Value="12.5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Height" Value="36"/>
+            <Setter Property="Height" Value="38"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Grid Background="Transparent">
-                            <Border x:Name="Hover" Background="#FFFFFF" Opacity="0" CornerRadius="7"/>
-                            <Border x:Name="Bar" Width="2.5" HorizontalAlignment="Left" Margin="0,9"
-                                    Background="{StaticResource Brush.Accent}" CornerRadius="1.5" Opacity="0"/>
-                            <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
-                                <Border x:Name="Dot" Width="5" Height="5" CornerRadius="2.5" Margin="0,0,10,0"
-                                        Background="{StaticResource Brush.TextFaint}" VerticalAlignment="Center"/>
+                            <Border x:Name="Hover" CornerRadius="9" Opacity="0">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#1FFFC077" Offset="0"/>
+                                        <GradientStop Color="#00FFC077" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+
+                            <Border x:Name="BarGlow" Width="6" HorizontalAlignment="Left" Margin="0,11"
+                                    Background="#FFC077" CornerRadius="3" Opacity="0" IsHitTestVisible="False">
+                                <Border.Effect>
+                                    <BlurEffect Radius="10"/>
+                                </Border.Effect>
+                            </Border>
+
+                            <Border x:Name="Bar" Width="3" HorizontalAlignment="Left" Margin="0,11"
+                                    Background="{StaticResource Brush.AccentGrad}" CornerRadius="2" Opacity="0"/>
+
+                            <StackPanel Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
+                                <Border x:Name="Dot" Width="6" Height="6" CornerRadius="3" Margin="0,0,11,0"
+                                        Background="{StaticResource Brush.TextFaint}" VerticalAlignment="Center"
+                                        RenderTransformOrigin="0.5,0.5">
+                                    <Border.RenderTransform>
+                                        <ScaleTransform x:Name="DotScale" ScaleX="1" ScaleY="1"/>
+                                    </Border.RenderTransform>
+                                </Border>
                                 <ContentPresenter VerticalAlignment="Center"/>
                             </StackPanel>
                         </Grid>
@@ -263,7 +471,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                             To="0.05" Duration="0:0:0.12"/>
+                                                             To="1" Duration="0:0:0.2"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -271,7 +479,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.18"/>
+                                                             To="0" Duration="0:0:0.3"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -283,9 +491,23 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Bar" Storyboard.TargetProperty="Opacity"
-                                                             To="1" Duration="0:0:0.16"/>
+                                                             To="1" Duration="0:0:0.22"/>
+                                            <DoubleAnimation Storyboard.TargetName="BarGlow" Storyboard.TargetProperty="Opacity"
+                                                             To="0.75" Duration="0:0:0.3"/>
                                             <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                             To="0.05" Duration="0:0:0.16"/>
+                                                             To="0.85" Duration="0:0:0.22"/>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
+                                                             From="1" To="1.5" Duration="0:0:0.45">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
+                                                             From="1" To="1.5" Duration="0:0:0.45">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -293,7 +515,13 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Bar" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.16"/>
+                                                             To="0" Duration="0:0:0.2"/>
+                                            <DoubleAnimation Storyboard.TargetName="BarGlow" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.2"/>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="1" Duration="0:0:0.2"/>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="1" Duration="0:0:0.2"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -304,7 +532,7 @@
             </Setter>
         </Style>
 
-        <!-- ========================== check box =========================== -->
+        <!-- check box -->
         <Style x:Key="Toggle" TargetType="CheckBox">
             <Setter Property="Foreground" Value="{StaticResource Brush.TextDim}"/>
             <Setter Property="FontSize" Value="12.5"/>
@@ -314,18 +542,29 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal" Background="Transparent">
-                            <Border x:Name="Box" Width="16" Height="16" CornerRadius="4" Margin="0,1,0,0"
-                                    Background="Transparent" BorderBrush="{StaticResource Brush.Line}"
-                                    BorderThickness="1.4" VerticalAlignment="Center">
-                                <Canvas Width="12" Height="12">
-                                    <Path x:Name="Mark" Data="M 3,6.2 L 5,8.2 L 9,3.8"
-                                          Stroke="{StaticResource Brush.Accent}" StrokeThickness="1.9"
-                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0"/>
-                                </Canvas>
-                            </Border>
+                            <Grid Width="20" Height="20" Margin="0,1,0,0" VerticalAlignment="Center">
+                                <Border x:Name="BoxGlow" CornerRadius="7" Background="#FFC077" Opacity="0"
+                                        IsHitTestVisible="False">
+                                    <Border.Effect>
+                                        <BlurEffect Radius="9"/>
+                                    </Border.Effect>
+                                </Border>
+                                <Border x:Name="Box" Width="16" Height="16" CornerRadius="4"
+                                        Background="#12000000" BorderBrush="{StaticResource Brush.Line}"
+                                        BorderThickness="1.4" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Canvas Width="12" Height="12">
+                                        <Path x:Name="Mark" Data="M 3,6.2 L 5,8.2 L 9,3.8"
+                                              Stroke="{StaticResource Brush.Accent}" StrokeThickness="1.9"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0"/>
+                                    </Canvas>
+                                </Border>
+                            </Grid>
                             <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#44566A"/>
+                            </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Brush.Accent}"/>
                                 <Setter Property="Foreground" Value="{StaticResource Brush.Text}"/>
@@ -333,7 +572,9 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Mark" Storyboard.TargetProperty="Opacity"
-                                                             To="1" Duration="0:0:0.14"/>
+                                                             To="1" Duration="0:0:0.16"/>
+                                            <DoubleAnimation Storyboard.TargetName="BoxGlow" Storyboard.TargetProperty="Opacity"
+                                                             To="0.55" Duration="0:0:0.24"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -341,13 +582,12 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Mark" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.12"/>
+                                                             To="0" Duration="0:0:0.14"/>
+                                            <DoubleAnimation Storyboard.TargetName="BoxGlow" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.2"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="BorderBrush" Value="#3A4553"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -355,7 +595,7 @@
             </Setter>
         </Style>
 
-        <!-- ============================ inputs ============================ -->
+        <!-- inputs: focus lights the field from behind the border -->
         <Style x:Key="Input" TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource Brush.SurfaceAlt}"/>
             <Setter Property="Foreground" Value="{StaticResource Brush.Text}"/>
@@ -370,18 +610,42 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border x:Name="Fill" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="Center"/>
-                        </Border>
+                        <Grid>
+                            <Border x:Name="Halo" Margin="-1" CornerRadius="9" Background="#FFC077" Opacity="0"
+                                    IsHitTestVisible="False">
+                                <Border.Effect>
+                                    <BlurEffect Radius="12"/>
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="Fill" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
+                                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"/>
+                            </Border>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="Fill" Property="BorderBrush" Value="{StaticResource Brush.Accent}"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                                                             To="0.3" Duration="0:0:0.2"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.3"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
+                                <Setter Property="Opacity" Value="0.45"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -389,7 +653,7 @@
             </Setter>
         </Style>
 
-        <!-- ============================ slider ============================ -->
+        <!-- slider -->
         <Style x:Key="Slider.Slim" TargetType="Slider">
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Height" Value="22"/>
@@ -404,7 +668,13 @@
                                     <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
                                         <RepeatButton.Template>
                                             <ControlTemplate TargetType="RepeatButton">
-                                                <Border Height="4" CornerRadius="2" Background="{StaticResource Brush.Accent}"/>
+                                                <Border Height="4" CornerRadius="2"
+                                                        Background="{StaticResource Brush.AccentGrad}">
+                                                    <Border.Effect>
+                                                        <DropShadowEffect Color="#FFC077" BlurRadius="10"
+                                                                          ShadowDepth="0" Opacity="0.8"/>
+                                                    </Border.Effect>
+                                                </Border>
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
@@ -419,12 +689,17 @@
                                     </RepeatButton>
                                 </Track.IncreaseRepeatButton>
                                 <Track.Thumb>
-                                    <Thumb Width="14" Height="14">
+                                    <Thumb Width="22" Height="22" Cursor="Hand">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Grid>
-                                                    <Ellipse Fill="{StaticResource Brush.Text}" Width="14" Height="14"/>
-                                                    <Ellipse Fill="{StaticResource Brush.Bg}" Width="5" Height="5"/>
+                                                <Grid Width="22" Height="22" RenderTransformOrigin="0.5,0.5">
+                                                    <Ellipse Fill="#FFC077" Opacity="0.5">
+                                                        <Ellipse.Effect>
+                                                            <BlurEffect Radius="9"/>
+                                                        </Ellipse.Effect>
+                                                    </Ellipse>
+                                                    <Ellipse Width="14" Height="14" Fill="#FFF4E6"/>
+                                                    <Ellipse Width="5" Height="5" Fill="#12161E"/>
                                                 </Grid>
                                             </ControlTemplate>
                                         </Thumb.Template>
@@ -437,18 +712,23 @@
             </Setter>
         </Style>
 
-        <!-- ========================== progress bar ======================== -->
+        <!-- progress bar: the fill itself is the light source -->
         <Style x:Key="Progress.Slim" TargetType="ProgressBar">
             <Setter Property="Background" Value="{StaticResource Brush.Line}"/>
-            <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
+            <Setter Property="Foreground" Value="{StaticResource Brush.AccentGrad}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="2" ClipToBounds="True">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="3">
                             <Grid>
                                 <Border x:Name="PART_Track"/>
                                 <Border x:Name="PART_Indicator" HorizontalAlignment="Left"
-                                        Background="{TemplateBinding Foreground}" CornerRadius="2"/>
+                                        Background="{TemplateBinding Foreground}" CornerRadius="3">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="#FFC077" BlurRadius="14" ShadowDepth="0"
+                                                          Opacity="0.9"/>
+                                    </Border.Effect>
+                                </Border>
                             </Grid>
                         </Border>
                     </ControlTemplate>
@@ -456,7 +736,7 @@
             </Setter>
         </Style>
 
-        <!-- ============================ lists ============================= -->
+        <!-- lists -->
         <Style x:Key="List.VersionItem" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{StaticResource Brush.TextDim}"/>
             <Setter Property="FontSize" Value="12.5"/>
@@ -465,11 +745,25 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Grid Background="Transparent" Height="34">
-                            <Border x:Name="Hover" Background="#FFFFFF" Opacity="0" CornerRadius="7"/>
-                            <Border x:Name="Bar" Width="2.5" HorizontalAlignment="Left" Margin="0,8"
-                                    Background="{StaticResource Brush.Accent}" CornerRadius="1.5" Opacity="0"/>
-                            <ContentPresenter Margin="14,0,10,0" VerticalAlignment="Center"/>
+                        <Grid Background="Transparent" Height="36" Margin="0,1">
+                            <Border x:Name="Hover" Background="#0DFFFFFF" Opacity="0" CornerRadius="8"/>
+                            <Border x:Name="Selection" CornerRadius="8" Opacity="0">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#33FFC077" Offset="0"/>
+                                        <GradientStop Color="#00FFC077" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Border x:Name="BarGlow" Width="6" HorizontalAlignment="Left" Margin="0,10"
+                                    Background="#FFC077" CornerRadius="3" Opacity="0" IsHitTestVisible="False">
+                                <Border.Effect>
+                                    <BlurEffect Radius="10"/>
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="Bar" Width="3" HorizontalAlignment="Left" Margin="0,10"
+                                    Background="{StaticResource Brush.AccentGrad}" CornerRadius="2" Opacity="0"/>
+                            <ContentPresenter Margin="16,0,10,0" VerticalAlignment="Center"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -477,7 +771,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                             To="0.05" Duration="0:0:0.1"/>
+                                                             To="1" Duration="0:0:0.14"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -485,7 +779,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.16"/>
+                                                             To="0" Duration="0:0:0.22"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -495,18 +789,24 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Selection" Storyboard.TargetProperty="Opacity"
+                                                             To="1" Duration="0:0:0.18"/>
                                             <DoubleAnimation Storyboard.TargetName="Bar" Storyboard.TargetProperty="Opacity"
-                                                             To="1" Duration="0:0:0.14"/>
-                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity"
-                                                             To="0.06" Duration="0:0:0.14"/>
+                                                             To="1" Duration="0:0:0.18"/>
+                                            <DoubleAnimation Storyboard.TargetName="BarGlow" Storyboard.TargetProperty="Opacity"
+                                                             To="0.8" Duration="0:0:0.26"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Selection" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.18"/>
                                             <DoubleAnimation Storyboard.TargetName="Bar" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.14"/>
+                                                             To="0" Duration="0:0:0.18"/>
+                                            <DoubleAnimation Storyboard.TargetName="BarGlow" Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.18"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -534,7 +834,7 @@
             </Setter>
         </Style>
 
-        <!-- =========================== scrollbar ========================== -->
+        <!-- scrollbar -->
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Template">
@@ -552,7 +852,7 @@
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border Background="#333D4A" CornerRadius="3" Margin="2,1"/>
+                                                <Border Background="#3A4756" CornerRadius="3" Margin="2,1"/>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -572,7 +872,7 @@
             </Style.Triggers>
         </Style>
 
-        <!-- ============================ tooltip =========================== -->
+        <!-- tooltip -->
         <Style TargetType="ToolTip">
             <Setter Property="Background" Value="{StaticResource Brush.SurfaceAlt}"/>
             <Setter Property="Foreground" Value="{StaticResource Brush.Text}"/>
@@ -586,6 +886,9 @@
                         <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7"
                                 Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#000000" BlurRadius="18" ShadowDepth="3" Opacity="0.6"/>
+                            </Border.Effect>
                             <ContentPresenter/>
                         </Border>
                     </ControlTemplate>

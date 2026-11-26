@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FastCraft.Auth;
@@ -64,6 +65,7 @@ namespace FastCraft
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            PlayEntrance();
             ApplySettingsToUi();
 
             try
@@ -145,6 +147,27 @@ namespace FastCraft
             VersionList.IsEnabled = !busy;
             SnapshotsCheck.IsEnabled = !busy;
             CancelButton.IsEnabled = busy;
+
+            // The status dot breathes while work is happening and goes quiet when it stops.
+            if (StatusDot != null)
+            {
+                StatusDot.BeginAnimation(UIElement.OpacityProperty, null);
+                if (busy)
+                {
+                    StatusDot.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0.25, 1,
+                        new Duration(TimeSpan.FromMilliseconds(720)))
+                    {
+                        AutoReverse = true,
+                        RepeatBehavior = RepeatBehavior.Forever,
+                        EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+                    });
+                }
+                else
+                {
+                    StatusDot.Opacity = 0.7;
+                }
+            }
+
             if (!string.IsNullOrEmpty(status)) StatusText.Text = status;
         }
 
@@ -311,18 +334,97 @@ namespace FastCraft
             {
                 if (candidate == null || candidate == page) continue;
                 candidate.Visibility = Visibility.Collapsed;
+                candidate.Effect = null;
             }
 
             page.Visibility = Visibility.Visible;
-            page.Opacity = 0;
-            var slide = new TranslateTransform(0, 12);
-            page.RenderTransform = slide;
+
+            // The entrance: the page rises, swells slightly and sharpens out of a blur,
+            // while its own children follow it up in a staggered wave.
+            var slide = new TranslateTransform(0, 30);
+            var scale = new ScaleTransform(0.985, 0.985);
+            var transform = new TransformGroup();
+            transform.Children.Add(scale);
+            transform.Children.Add(slide);
+            page.RenderTransformOrigin = new Point(0.5, 0.35);
+            page.RenderTransform = transform;
+
+            var blur = new BlurEffect { Radius = 12 };
+            page.Effect = blur;
+
+            var ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
+            var duration = new Duration(TimeSpan.FromMilliseconds(430));
+            page.BeginAnimation(UIElement.OpacityProperty,
+                new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
+            slide.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(30, 0, duration) { EasingFunction = ease });
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty,
+                new DoubleAnimation(0.985, 1, duration) { EasingFunction = ease });
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty,
+                new DoubleAnimation(0.985, 1, duration) { EasingFunction = ease });
+
+            var sharpen = new DoubleAnimation(12, 0, new Duration(TimeSpan.FromMilliseconds(280)))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+            sharpen.Completed += delegate { page.Effect = null; };
+            blur.BeginAnimation(BlurEffect.RadiusProperty, sharpen);
+
+            var index = 0;
+            RiseIntoView(page, ref index, 0);
+        }
+
+        /// <summary>
+        /// Fades and lifts the children of a page one after another so that a page change
+        /// reads as one movement instead of a single frame swap. Panels of a few children
+        /// are walked into, which makes the labels and the buttons arrive a beat apart.
+        /// </summary>
+        private void RiseIntoView(Panel panel, ref int index, int depth)
+        {
+            if (panel == null) return;
 
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var duration = new Duration(TimeSpan.FromMilliseconds(240));
-            page.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
+            var duration = new Duration(TimeSpan.FromMilliseconds(460));
+
+            foreach (UIElement element in panel.Children)
+            {
+                if (element == null) continue;
+
+                var inner = element as Panel;
+                if (inner != null && depth < 2 && inner.Children.Count > 0 && inner.Children.Count <= 8)
+                {
+                    RiseIntoView(inner, ref index, depth + 1);
+                    continue;
+                }
+
+                var target = element.Opacity;
+                var slide = new TranslateTransform(0, 22);
+                element.RenderTransform = slide;
+                var delay = TimeSpan.FromMilliseconds(40 + index * 45);
+                index++;
+
+                element.BeginAnimation(UIElement.OpacityProperty,
+                    new DoubleAnimation(0, target, duration) { BeginTime = delay, EasingFunction = ease });
+                slide.BeginAnimation(TranslateTransform.YProperty,
+                    new DoubleAnimation(22, 0, duration) { BeginTime = delay, EasingFunction = ease });
+            }
+        }
+
+        /// <summary>The whole window fades and settles when it opens.</summary>
+        private void PlayEntrance()
+        {
+            if (RootGrid == null) return;
+
+            RootGrid.Opacity = 0;
+            var slide = new TranslateTransform(0, 16);
+            RootGrid.RenderTransform = slide;
+
+            var ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
+            var duration = new Duration(TimeSpan.FromMilliseconds(560));
+            RootGrid.BeginAnimation(UIElement.OpacityProperty,
+                new DoubleAnimation(0, 1, duration) { EasingFunction = ease });
             slide.BeginAnimation(TranslateTransform.YProperty,
-                new DoubleAnimation(12, 0, duration) { EasingFunction = ease });
+                new DoubleAnimation(16, 0, duration) { EasingFunction = ease });
         }
 
         private void VersionList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -338,10 +440,40 @@ namespace FastCraft
             {
                 VersionHero.Text = "—";
                 VersionMeta.Text = "No version selected";
-                return;
             }
-            VersionHero.Text = summary.Id;
-            VersionMeta.Text = summary.Type == "snapshot" ? "Snapshot build" : "Release build";
+            else
+            {
+                VersionHero.Text = summary.Id;
+                VersionMeta.Text = summary.Type == "snapshot" ? "Snapshot build" : "Release build";
+            }
+            AnimateHero();
+        }
+
+        /// <summary>
+        /// The version name swells into place and its glow flares with it every time the
+        /// selection changes, so that picking a version feels like it did something.
+        /// </summary>
+        private void AnimateHero()
+        {
+            if (VersionHero == null) return;
+
+            VersionHero.RenderTransformOrigin = new Point(0, 0.6);
+            var scale = new ScaleTransform(1.07, 1.07);
+            VersionHero.RenderTransform = scale;
+
+            var ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
+            var duration = new Duration(TimeSpan.FromMilliseconds(480));
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty,
+                new DoubleAnimation(1.07, 1, duration) { EasingFunction = ease });
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty,
+                new DoubleAnimation(1.07, 1, duration) { EasingFunction = ease });
+
+            var glow = VersionHero.Effect as DropShadowEffect;
+            if (glow == null || glow.IsFrozen) return;
+            glow.BeginAnimation(DropShadowEffect.OpacityProperty,
+                new DoubleAnimation(1.1, 0.5, duration) { EasingFunction = ease });
+            glow.BeginAnimation(DropShadowEffect.BlurRadiusProperty,
+                new DoubleAnimation(46, 28, duration) { EasingFunction = ease });
         }
 
         /// <summary>
