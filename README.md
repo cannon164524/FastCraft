@@ -83,6 +83,11 @@ The result is in `bin\Release\net8.0-windows\win-x64\publish\FastCraft.exe`.
 3. Press **Launch Minecraft**. On the first launch it downloads the version, libraries, natives and assets; after
    that, launching only checks what changed.
 
+If signing in says *"Microsoft sign-in could not be started (HTTP 400)"*, Microsoft rejected FastCraft's app id
+(the message now includes Microsoft's own error text; `AADSTS700016` means the id no longer exists). Register your
+own Azure app — Microsoft Accounts tenant, public client, device code flow — and put its id in
+`AuthService.ClientId` in `Auth/AuthService.cs`.
+
 ## Where things are stored
 
 Everything lives under `%APPDATA%\FastCraft`:
@@ -115,6 +120,8 @@ FastCraft is not affiliated with Mojang or Microsoft. It contains no game code: 
 from Mojang's public CDN after you sign in with an account that owns the game, and it refuses to continue when the
 account does not own Minecraft: Java Edition. Do not use it to play without a licence.
 
-The sign-in uses the public Xbox Live client id `00000000402b5328`, which several open-source launchers use.
-If Microsoft ever retires it, register your own app in Azure (public client, device code flow enabled) and replace
+The sign-in uses Prism Launcher's public Azure app id `c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb` — a public client
+in the Microsoft Accounts tenant with the device code flow enabled. The old Xbox Live id `00000000402b5328`
+that many launchers used for years was retired and now answers `AADSTS700016`. If the current id is retired too,
+register your own app in Azure (consumers tenant, public client, device code flow) and replace
 `AuthService.ClientId` in `Auth/AuthService.cs`.

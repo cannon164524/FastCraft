@@ -30,9 +30,10 @@ namespace FastCraft.Auth
     /// </summary>
     public sealed class AuthService
     {
-        // Public Xbox Live client id, used by several open-source launchers. If Microsoft
-        // retires it, register your own app in Azure and replace this value.
-        public const string ClientId = "00000000402b5328";
+        // Public Azure app id for the Microsoft Accounts tenant, with the device code flow
+        // enabled (used by Prism Launcher). The old Xbox Live id 00000000402b5328 was
+        // retired and now returns AADSTS700016 from the consumers endpoint.
+        public const string ClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
         private const string DeviceCodeUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
         private const string TokenUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
@@ -45,11 +46,12 @@ namespace FastCraft.Auth
         public async Task<DeviceCode> StartDeviceCodeAsync(CancellationToken cancellationToken)
         {
             var form = "client_id=" + Uri.EscapeDataString(ClientId)
-                     + "&scope=" + Uri.EscapeDataString("XboxLive.signin offline_access");
+                     + "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access");
             var result = await Http.PostFormAsync(DeviceCodeUrl, form, cancellationToken).ConfigureAwait(false);
             if (result.Status != HttpStatusCode.OK)
             {
-                throw new AuthException("Microsoft sign-in could not be started (HTTP " + (int)result.Status + ").");
+                throw new AuthException("Microsoft sign-in could not be started (HTTP " + (int)result.Status + "). "
+                    + DescribeError(result.Body));
             }
 
             var code = new DeviceCode();
@@ -275,7 +277,7 @@ namespace FastCraft.Auth
             var form = "grant_type=refresh_token"
                      + "&client_id=" + Uri.EscapeDataString(ClientId)
                      + "&refresh_token=" + Uri.EscapeDataString(account.RefreshToken)
-                     + "&scope=" + Uri.EscapeDataString("XboxLive.signin offline_access");
+                     + "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access");
             var result = await Http.PostFormAsync(TokenUrl, form, cancellationToken).ConfigureAwait(false);
 
             string access = null;
@@ -344,6 +346,27 @@ namespace FastCraft.Auth
             {
             }
             return "unknown error";
+        }
+
+        private static string DescribeError(string body)
+        {
+            try
+            {
+                using (var document = JsonDocument.Parse(body))
+                {
+                    var error = JsonHelp.GetString(document.RootElement, "error");
+                    var description = JsonHelp.GetString(document.RootElement, "error_description");
+                    var parts = "";
+                    if (!string.IsNullOrEmpty(error)) parts = error;
+                    if (!string.IsNullOrEmpty(description)) parts = string.IsNullOrEmpty(parts) ? description : parts + ": " + description;
+                    if (parts.Length > 400) parts = parts.Substring(0, 400);
+                    return parts;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+            return "";
         }
 
         private static string DescribeXstsError(long xerr)
