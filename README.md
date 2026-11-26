@@ -86,13 +86,19 @@ The result is in `bin\Release\net8.0-windows\win-x64\publish\FastCraft.exe`.
    that, launching only checks what changed.
 4. **Without signing in**: tick **Offline mode**, type a player name, and press Launch — see below.
 
+If the game exits with an error, FastCraft names the newest **crash report** and the **game log**
+(`instances\<version>\crash-reports` and `instances\<version>\logs\latest.log`) in a message and in the window's log,
+and the window's log already holds the game's own output. Those files are what explain a crash.
+
 ### Offline mode
 
 Sign-in can be unavailable for reasons that have nothing to do with the game itself, so FastCraft can start
 Minecraft with a local profile instead:
 
 - The name is turned into the same UUID Java gives an offline player (`UUID.nameUUIDFromBytes("OfflinePlayer:<name>")`,
-  a version-3 UUID), so a world you create offline is still yours when you later sign in with that name.
+  a version-3 UUID), so every offline launch with that name is the same player and keeps its single-player
+  data. A signed-in account has its own Mojang UUID, so it is a different player in that same world; to keep
+  the offline inventory, copy `playerdata\<offline-uuid>.dat` to `playerdata\<real-uuid>.dat` in the world folder.
 - The session handed to the game is a placeholder and `--xuid` / `--clientId` are left out: nothing pretends to be a
   Microsoft session.
 - **Single player and LAN only.** Online servers, Realms, skins and chat signing need a real session and refuse an

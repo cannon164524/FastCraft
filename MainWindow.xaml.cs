@@ -50,6 +50,8 @@ namespace FastCraft
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             _timer.Tick += Timer_Tick;
 
+            _launcher.Crashed += OnGameCrashed;
+
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
         }
@@ -403,6 +405,21 @@ namespace FastCraft
         /// applied to an offline name, so a world made offline keeps working when its owner later
         /// signs in with the real account of that name.
         /// </summary>
+        private void OnGameCrashed(string message)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action<string>(OnGameCrashed), message);
+                return;
+            }
+            Log(message);
+            StatusText.Text = "Minecraft crashed.";
+            MessageBox.Show(this,
+                message + Environment.NewLine + Environment.NewLine
+                + "Those two files hold the reason; the log above also has the game's output.",
+                "Minecraft crashed", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
         private static bool IsValidPlayerName(string name)
         {
             if (string.IsNullOrEmpty(name) || name.Length < 3 || name.Length > 16) return false;

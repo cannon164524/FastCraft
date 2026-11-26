@@ -27,6 +27,12 @@ namespace FastCraft.Game
 
         public Process Current { get; private set; }
 
+        /// <summary>
+        /// Raised with an explanation (exit code and where the crash report and game log
+        /// are) when Minecraft exits with a non-zero code. May be raised on any thread.
+        /// </summary>
+        public event Action<string> Crashed;
+
         public async Task<Process> LaunchAsync(VersionData version, Account account, Settings settings,
             Action<string> log, CancellationToken cancellationToken)
         {
@@ -78,7 +84,27 @@ namespace FastCraft.Game
             {
                 try
                 {
-                    log("[mc] Minecraft exited with code " + process.ExitCode + ".");
+                    var code = process.ExitCode;
+                    if (code == 0)
+                    {
+                        log("[mc] Minecraft exited normally.");
+                        return;
+                    }
+
+                    var message = DescribeCrash(gameDirectory, code);
+                    log(message);
+
+                    var handler = Crashed;
+                    if (handler != null)
+                    {
+                        try
+                        {
+                            handler(message);
+                        }
+                        catch
+                        {
+                        }
+                    }
                 }
                 catch
                 {
@@ -100,6 +126,47 @@ namespace FastCraft.Game
 
             Current = process;
             return process;
+        }
+
+        /// <summary>
+        /// Finds the newest crash report and the game log for a crashed run, so the reason
+        /// can be read without hunting through folders.
+        /// </summary>
+        private static string DescribeCrash(string gameDirectory, int code)
+        {
+            var message = "Minecraft exited with code " + code + ".";
+            try
+            {
+                var reports = Path.Combine(gameDirectory, "crash-reports");
+                if (Directory.Exists(reports))
+                {
+                    var latest = "";
+                    var latestTime = DateTime.MinValue;
+                    foreach (var file in Directory.GetFiles(reports, "*.txt"))
+                    {
+                        var time = File.GetLastWriteTimeUtc(file);
+                        if (time > latestTime)
+                        {
+                            latestTime = time;
+                            latest = file;
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(latest))
+                    {
+                        message += Environment.NewLine + "Crash report: " + latest;
+                    }
+                }
+
+                var log = Path.Combine(gameDirectory, "logs", "latest.log");
+                if (File.Exists(log))
+                {
+                    message += Environment.NewLine + "Game log: " + log;
+                }
+            }
+            catch
+            {
+            }
+            return message;
         }
     }
 }
