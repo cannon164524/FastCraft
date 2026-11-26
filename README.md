@@ -88,8 +88,10 @@ If signing in says *"Microsoft sign-in could not be started (HTTP 400)"*, Micros
 own Azure app — Microsoft Accounts tenant, public client, device code flow — and put its id in
 `AuthService.ClientId` in `Auth/AuthService.cs`.
 
-Every sign-in failure is also written to `%APPDATA%\FastCraft\auth.log`, with the HTTP status and the server's
-error text — that file is what to include in a bug report.
+Every sign-in step is also written to `%APPDATA%\FastCraft\auth.log` with its HTTP status and the server's
+error text (`Device code`, `Xbox Live`, `XSTS`, `Launcher login`, `login_with_xbox`, `Profile`), never a token.
+That file is what to include in a bug report. FastCraft tries both token endpoints and uses the first whose
+profile loads, so one rejected route cannot block sign-in; the window title shows the version you are running.
 
 ## Updates
 

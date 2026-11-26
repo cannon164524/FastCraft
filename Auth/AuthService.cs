@@ -35,6 +35,8 @@ namespace FastCraft.Auth
         // retired and now returns AADSTS700016 from the consumers endpoint.
         public const string ClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
+        private const string NoProfileMessage = "This Microsoft account has no Minecraft: Java Edition profile, so it does not own the game. Buy Minecraft: Java Edition at minecraft.net, or start the official launcher once if you play through Xbox Game Pass.";
+
         private const string DeviceCodeUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
         private const string TokenUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
         private const string XblUrl = "https://user.auth.xboxlive.com/user/authenticate";
@@ -48,6 +50,7 @@ namespace FastCraft.Auth
             var form = "client_id=" + Uri.EscapeDataString(ClientId)
                      + "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access");
             var result = await Http.PostFormAsync(DeviceCodeUrl, form, cancellationToken).ConfigureAwait(false);
+            AuthLog.Write("Device code: HTTP " + (int)result.Status);
             if (result.Status != HttpStatusCode.OK)
             {
                 throw new AuthException("Microsoft sign-in could not be started (HTTP " + (int)result.Status + "). "
@@ -133,6 +136,7 @@ namespace FastCraft.Auth
                 ["TokenType"] = "JWT"
             };
             var xblResult = await Http.PostJsonAsync(XblUrl, xblBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
+            AuthLog.Write("Xbox Live: HTTP " + (int)xblResult.Status);
             if (xblResult.Status != HttpStatusCode.OK)
             {
                 throw new AuthException("Xbox Live sign-in failed (HTTP " + (int)xblResult.Status + ").");
@@ -190,75 +194,91 @@ namespace FastCraft.Auth
 
             if (string.IsNullOrEmpty(xstsToken) || string.IsNullOrEmpty(uhs))
             {
+                AuthLog.Write("XSTS: HTTP " + (int)xstsResult.Status + ", XErr=" + xerr);
                 throw new AuthException(DescribeXstsError(xerr));
             }
+            AuthLog.Write("XSTS: HTTP " + (int)xstsResult.Status + ", XErr=0, uhs length " + uhs.Length);
             var xuid = uhs;
 
-            // 3. Minecraft access token. The official launcher (and Prism) use
-            // /launcher/login with the XSTS token; login_with_xbox is the older
-            // third-party endpoint and is kept as a fallback.
+            // 3. Minecraft access token and profile. The official launcher's /launcher/login
+            // is tried first, then the older login_with_xbox endpoint; the first token whose
+            // profile loads is used, so a route that hands back a rejected token cannot
+            // block sign-in.
             var xToken = "XBL3.0 x=" + uhs + ";" + xstsToken;
             string mcToken = null;
             long expiresIn = 0;
-            string tokenError = "";
+            string profileBody = null;
+            string failure = "";
 
             var launcherBody = new JsonObject { ["xtoken"] = xToken, ["platform"] = "PC_LAUNCHER" };
             var launcherResult = await Http.PostJsonAsync(McLauncherLoginUrl, launcherBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
-            if (launcherResult.Status == HttpStatusCode.OK)
+            AuthLog.Write("Launcher login: HTTP " + (int)launcherResult.Status);
+
+            var launcherToken = ReadMinecraftToken(launcherResult, out expiresIn);
+            if (string.IsNullOrEmpty(launcherToken))
             {
-                using (var document = JsonDocument.Parse(launcherResult.Body))
-                {
-                    mcToken = JsonHelp.GetString(document.RootElement, "access_token");
-                    expiresIn = JsonHelp.GetLong(document.RootElement, "expires_in");
-                }
+                failure = "Launcher login HTTP " + (int)launcherResult.Status + ": " + DescribeError(launcherResult.Body);
             }
             else
             {
-                tokenError = "HTTP " + (int)launcherResult.Status + ": " + DescribeError(launcherResult.Body);
-            }
-
-            if (string.IsNullOrEmpty(mcToken))
-            {
-                var loginBody = new JsonObject { ["identityToken"] = xToken };
-                var loginResult = await Http.PostJsonAsync(McLoginWithXboxUrl, loginBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
-                if (loginResult.Status == HttpStatusCode.OK)
+                var profile = await Http.GetAsync(McProfileUrl, "Bearer " + launcherToken, cancellationToken).ConfigureAwait(false);
+                AuthLog.Write("Profile (launcher login token): HTTP " + (int)profile.Status + " " + DescribeError(profile.Body));
+                if (profile.Status == HttpStatusCode.OK)
                 {
-                    using (var document = JsonDocument.Parse(loginResult.Body))
-                    {
-                        mcToken = JsonHelp.GetString(document.RootElement, "access_token");
-                        expiresIn = JsonHelp.GetLong(document.RootElement, "expires_in");
-                    }
+                    mcToken = launcherToken;
+                    profileBody = profile.Body;
+                }
+                else if (profile.Status == HttpStatusCode.NotFound)
+                {
+                    throw new AuthException(NoProfileMessage);
                 }
                 else
                 {
-                    var second = "HTTP " + (int)loginResult.Status + ": " + DescribeError(loginResult.Body);
-                    tokenError = string.IsNullOrEmpty(tokenError) ? second : tokenError + " / " + second;
+                    failure = "Profile HTTP " + (int)profile.Status + ": " + DescribeError(profile.Body);
                 }
             }
 
-            if (string.IsNullOrEmpty(mcToken))
+            if (string.IsNullOrEmpty(profileBody))
             {
-                throw new AuthException("Minecraft sign-in failed. " + tokenError);
+                var loginBody = new JsonObject { ["identityToken"] = xToken };
+                var loginResult = await Http.PostJsonAsync(McLoginWithXboxUrl, loginBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
+                AuthLog.Write("login_with_xbox: HTTP " + (int)loginResult.Status);
+
+                long xboxExpires;
+                var xboxToken = ReadMinecraftToken(loginResult, out xboxExpires);
+                if (string.IsNullOrEmpty(xboxToken))
+                {
+                    failure = failure + " / login_with_xbox HTTP " + (int)loginResult.Status + ": " + DescribeError(loginResult.Body);
+                }
+                else
+                {
+                    var profile = await Http.GetAsync(McProfileUrl, "Bearer " + xboxToken, cancellationToken).ConfigureAwait(false);
+                    AuthLog.Write("Profile (login_with_xbox token): HTTP " + (int)profile.Status + " " + DescribeError(profile.Body));
+                    if (profile.Status == HttpStatusCode.OK)
+                    {
+                        mcToken = xboxToken;
+                        expiresIn = xboxExpires;
+                        profileBody = profile.Body;
+                    }
+                    else if (profile.Status == HttpStatusCode.NotFound)
+                    {
+                        throw new AuthException(NoProfileMessage);
+                    }
+                    else
+                    {
+                        failure = failure + " / Profile HTTP " + (int)profile.Status + ": " + DescribeError(profile.Body);
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(profileBody) || string.IsNullOrEmpty(mcToken))
+            {
+                throw new AuthException("Could not sign in to Minecraft. " + failure);
             }
 
             // 4. Ownership: a profile exists only for an account with Minecraft: Java
             // Edition (or Xbox Game Pass), and /minecraft/profile answers 404 otherwise.
             // The old /entitlements/mcstore check now answers 401, so it is not used.
-            var profile = await Http.GetAsync(McProfileUrl, "Bearer " + mcToken, cancellationToken).ConfigureAwait(false);
-            if (profile.Status == HttpStatusCode.NotFound)
-            {
-                throw new AuthException("This Microsoft account has no Minecraft: Java Edition profile, so it does not own the game. Buy Minecraft: Java Edition at minecraft.net, or start the official launcher once if you play through Xbox Game Pass.");
-            }
-            if (profile.Status != HttpStatusCode.OK)
-            {
-                var details = "Could not load the Minecraft profile (HTTP " + (int)profile.Status + "). " + DescribeError(profile.Body);
-                if (!string.IsNullOrEmpty(tokenError))
-                {
-                    details += " Launcher login said: " + tokenError;
-                }
-                throw new AuthException(details);
-            }
-
             var account = new Account
             {
                 AccessToken = mcToken,
@@ -266,7 +286,7 @@ namespace FastCraft.Auth
                 Xuid = xuid,
                 ExpiresAt = DateTime.UtcNow.AddSeconds(expiresIn > 0 ? expiresIn : 86400)
             };
-            using (var document = JsonDocument.Parse(profile.Body))
+            using (var document = JsonDocument.Parse(profileBody))
             {
                 account.Name = JsonHelp.GetString(document.RootElement, "name");
                 account.Uuid = JsonHelp.GetString(document.RootElement, "id");
@@ -359,8 +379,25 @@ namespace FastCraft.Auth
             return "unknown error";
         }
 
-        private static string DescribeError(string body)
+        private static string ReadMinecraftToken((HttpStatusCode Status, string Body) result, out long expiresIn)
         {
+            expiresIn = 0;
+            if (result.Status != HttpStatusCode.OK) return null;
+            try
+            {
+                using (var document = JsonDocument.Parse(result.Body))
+                {
+                    expiresIn = JsonHelp.GetLong(document.RootElement, "expires_in");
+                    return JsonHelp.GetString(document.RootElement, "access_token");
+                }
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private static string DescribeError(string body)        {
             try
             {
                 using (var document = JsonDocument.Parse(body))

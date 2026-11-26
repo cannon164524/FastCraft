@@ -36,6 +36,7 @@ namespace FastCraft
         public MainWindow()
         {
             InitializeComponent();
+            Title = "FastCraft " + UpdateService.CurrentVersion;
 
             Locations.Ensure();
             _settings = Settings.Load(Locations.SettingsPath);
