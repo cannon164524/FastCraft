@@ -22,7 +22,6 @@ namespace FastCraft.Game
     {
         public string Name;
         public string Key;
-        public bool NativeOnly;
         public string ArtifactPath;
         public string ArtifactUrl;
         public string ArtifactSha1;

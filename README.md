@@ -17,7 +17,9 @@ you use while Microsoft's sign-in is unavailable; it cannot join online servers 
   files are no longer re-hashed every time you press Launch.
 - **No re-downloading.** Files are skipped when the size matches, or when the hash matches after a single
   verification. Only changed files are fetched again.
-- **Natives are extracted to a clean folder** each launch, so a stale DLL can never block the game.
+- **Natives the way the official launcher handles them.** Since 1.19 the `*-natives-windows` jars stay on the
+  classpath and LWJGL unpacks its DLLs from them at startup; only 1.18 and older have native archives that
+  FastCraft unpacks itself, into a clean folder each launch, so a stale DLL cannot block the game.
 - **Resolved version JSON is reused**; the version list is cached locally and refreshed in the background.
 - **Reuses the official launcher's files.** If `%APPDATA%\.minecraft` already has the libraries and assets
   (because you played vanilla), FastCraft copies them instead of downloading them again; every copied file is
@@ -53,6 +55,14 @@ Pick one:
 - To see the exit code: open PowerShell in the exe's folder and run `& .\FastCraft.exe; $LASTEXITCODE`.
 - An unsigned exe downloaded from the internet can be blocked by Windows: right-click the exe →
   *Properties* → tick *Unblock*, or in the SmartScreen prompt choose *More info* → *Run anyway*.
+
+### If Minecraft crashes with `Failed to locate library: lwjgl.dll`
+
+That was a real FastCraft bug, fixed after build `cae4525`. Since Minecraft 1.19 the natives travel as
+`*-natives-windows` jars on the **classpath**, and LWJGL unpacks `lwjgl.dll` from them at startup. FastCraft used to
+take those jars off the classpath and unpack them into `natives\` instead, a folder the game no longer reads, so the
+first LWJGL call died. Update to the newest build; it also prints the classpath size and the number of unpacked
+native archives to the window log, and an "already up to date" run re-checks every file it needs.
 
 ## Requirements
 

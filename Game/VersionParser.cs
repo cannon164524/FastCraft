@@ -188,24 +188,16 @@ namespace FastCraft.Game
             }
 
             // From 1.19 on, the natives are separate library entries whose name carries the
-            // "natives-windows" classifier instead of the old "natives" map. Those jars are
-            // extracted and must not end up on the classpath.
-            if (string.IsNullOrEmpty(info.NativePath) &&
-                name.IndexOf(":natives-windows", StringComparison.OrdinalIgnoreCase) >= 0)
+            // "natives-windows" classifier instead of the old "natives" map. Those jars belong ON
+            // the classpath: LWJGL unpacks lwjgl.dll and the rest from them at startup, into the
+            // folder given by org.lwjgl.system.SharedLibraryExtractPath. Taking them off the
+            // classpath is what kills the game with "Failed to locate library: lwjgl.dll", so
+            // only the architecture is checked here.
+            if (name.IndexOf(":natives-windows", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 bool isArm64 = name.IndexOf("natives-windows-arm64", StringComparison.OrdinalIgnoreCase) >= 0;
                 if (isArm64 && Platform.ArchName != "arm64") return;
                 if (!isArm64 && Platform.ArchName == "arm64") return;
-
-                info.NativeOnly = true;
-                info.NativePath = info.ArtifactPath;
-                info.NativeUrl = info.ArtifactUrl;
-                info.NativeSha1 = info.ArtifactSha1;
-                info.NativeSize = info.ArtifactSize;
-                info.ArtifactPath = null;
-                info.ArtifactUrl = null;
-                info.ArtifactSha1 = null;
-                info.ArtifactSize = 0;
             }
 
             if (string.IsNullOrEmpty(info.ArtifactPath) && string.IsNullOrEmpty(info.NativePath)) return;
@@ -218,6 +210,9 @@ namespace FastCraft.Game
             var at = trimmed.IndexOf('@');
             if (at > 0) trimmed = trimmed.Substring(0, at);
             var parts = trimmed.Split(':');
+            // The classifier belongs in the key: "org.lwjgl:lwjgl:3.4.3:natives-windows" and
+            // "org.lwjgl:lwjgl:3.4.3" are two different jars, and both belong on the classpath.
+            if (parts.Length >= 4) return parts[0] + ":" + parts[1] + ":" + parts[3];
             if (parts.Length >= 2) return parts[0] + ":" + parts[1];
             return trimmed;
         }

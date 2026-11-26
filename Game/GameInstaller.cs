@@ -52,7 +52,7 @@ namespace FastCraft.Game
             // in the list), but preserving its position in the classpath.
             foreach (var library in version.Libraries)
             {
-                if (!library.NativeOnly && !string.IsNullOrEmpty(library.ArtifactPath) && !string.IsNullOrEmpty(library.ArtifactUrl))
+                if (!string.IsNullOrEmpty(library.ArtifactPath) && !string.IsNullOrEmpty(library.ArtifactUrl))
                 {
                     var key = library.Key ?? library.Name ?? "";
                     int index;
@@ -95,6 +95,11 @@ namespace FastCraft.Game
                     Size = version.ClientSize
                 });
             }
+
+            // Since 1.19 the natives travel as *-natives-windows jars on the classpath and LWJGL
+            // unpacks them itself; only older versions have archives to unpack here.
+            log("Classpath: " + result.Classpath.Count + " libraries, "
+                + nativeLibs.Count + " native archive(s) to unpack.");
 
             foreach (var library in nativeLibs)
             {
