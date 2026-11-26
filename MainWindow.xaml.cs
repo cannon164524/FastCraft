@@ -41,7 +41,7 @@ namespace FastCraft
         {
             InitializeComponent();
             Title = "FastCraft " + UpdateService.CurrentVersion;
-            TitleVersion.Text = UpdateService.CurrentVersion;
+            TitleVersion.Text = UpdateService.CurrentVersion.ToString();
             Icon = BuildWindowIcon();
 
             Locations.Ensure();
