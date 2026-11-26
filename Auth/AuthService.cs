@@ -39,8 +39,8 @@ namespace FastCraft.Auth
         private const string TokenUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
         private const string XblUrl = "https://user.auth.xboxlive.com/user/authenticate";
         private const string XstsUrl = "https://xsts.auth.xboxlive.com/xsts/authorize";
-        private const string McLoginUrl = "https://api.minecraftservices.com/authentication/login_with_xbox";
-        private const string McEntitlementsUrl = "https://api.minecraftservices.com/entitlements/mcstore";
+        private const string McLauncherLoginUrl = "https://api.minecraftservices.com/launcher/login";
+        private const string McLoginWithXboxUrl = "https://api.minecraftservices.com/authentication/login_with_xbox";
         private const string McProfileUrl = "https://api.minecraftservices.com/minecraft/profile";
 
         public async Task<DeviceCode> StartDeviceCodeAsync(CancellationToken cancellationToken)
@@ -194,58 +194,64 @@ namespace FastCraft.Auth
             }
             var xuid = uhs;
 
-            // 3. Minecraft services
-            var loginBody = new JsonObject { ["identityToken"] = "XBL3.0 x=" + uhs + ";" + xstsToken };
-            var loginResult = await Http.PostJsonAsync(McLoginUrl, loginBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
+            // 3. Minecraft access token. The official launcher (and Prism) use
+            // /launcher/login with the XSTS token; login_with_xbox is the older
+            // third-party endpoint and is kept as a fallback.
+            var xToken = "XBL3.0 x=" + uhs + ";" + xstsToken;
             string mcToken = null;
             long expiresIn = 0;
-            using (var document = JsonDocument.Parse(loginResult.Body))
-            {
-                mcToken = JsonHelp.GetString(document.RootElement, "access_token");
-                expiresIn = JsonHelp.GetLong(document.RootElement, "expires_in");
-            }
-            if (string.IsNullOrEmpty(mcToken))
-            {
-                throw new AuthException("Minecraft sign-in failed. " + Trimmed(loginResult.Body));
-            }
+            string tokenError = "";
 
-            // 4. Ownership check — this launcher does not do offline mode.
-            var entitlements = await Http.GetAsync(McEntitlementsUrl, "Bearer " + mcToken, cancellationToken).ConfigureAwait(false);
-            if (entitlements.Status != HttpStatusCode.OK)
+            var launcherBody = new JsonObject { ["xtoken"] = xToken, ["platform"] = "PC_LAUNCHER" };
+            var launcherResult = await Http.PostJsonAsync(McLauncherLoginUrl, launcherBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
+            if (launcherResult.Status == HttpStatusCode.OK)
             {
-                throw new AuthException("Could not check game ownership (HTTP " + (int)entitlements.Status + ").");
-            }
-            bool owns = false;
-            using (var document = JsonDocument.Parse(entitlements.Body))
-            {
-                JsonElement items;
-                if (document.RootElement.TryGetProperty("items", out items) && items.ValueKind == JsonValueKind.Array)
+                using (var document = JsonDocument.Parse(launcherResult.Body))
                 {
-                    foreach (var item in items.EnumerateArray())
-                    {
-                        var name = JsonHelp.GetString(item, "name") ?? "";
-                        if (name.IndexOf("minecraft", StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            owns = true;
-                            break;
-                        }
-                    }
+                    mcToken = JsonHelp.GetString(document.RootElement, "access_token");
+                    expiresIn = JsonHelp.GetLong(document.RootElement, "expires_in");
                 }
             }
-            if (!owns)
+            else
             {
-                throw new AuthException("This Microsoft account does not own Minecraft: Java Edition. FastCraft only works with a legitimately purchased copy.");
+                tokenError = "HTTP " + (int)launcherResult.Status + ": " + DescribeError(launcherResult.Body);
             }
 
-            // 5. Profile
+            if (string.IsNullOrEmpty(mcToken))
+            {
+                var loginBody = new JsonObject { ["identityToken"] = xToken };
+                var loginResult = await Http.PostJsonAsync(McLoginWithXboxUrl, loginBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
+                if (loginResult.Status == HttpStatusCode.OK)
+                {
+                    using (var document = JsonDocument.Parse(loginResult.Body))
+                    {
+                        mcToken = JsonHelp.GetString(document.RootElement, "access_token");
+                        expiresIn = JsonHelp.GetLong(document.RootElement, "expires_in");
+                    }
+                }
+                else
+                {
+                    var second = "HTTP " + (int)loginResult.Status + ": " + DescribeError(loginResult.Body);
+                    tokenError = string.IsNullOrEmpty(tokenError) ? second : tokenError + " / " + second;
+                }
+            }
+
+            if (string.IsNullOrEmpty(mcToken))
+            {
+                throw new AuthException("Minecraft sign-in failed. " + tokenError);
+            }
+
+            // 4. Ownership: a profile exists only for an account with Minecraft: Java
+            // Edition (or Xbox Game Pass), and /minecraft/profile answers 404 otherwise.
+            // The old /entitlements/mcstore check now answers 401, so it is not used.
             var profile = await Http.GetAsync(McProfileUrl, "Bearer " + mcToken, cancellationToken).ConfigureAwait(false);
             if (profile.Status == HttpStatusCode.NotFound)
             {
-                throw new AuthException("This account has no Minecraft: Java Edition profile. Buy the game at minecraft.net first.");
+                throw new AuthException("This Microsoft account has no Minecraft: Java Edition profile, so it does not own the game. Buy Minecraft: Java Edition at minecraft.net, or start the official launcher once if you play through Xbox Game Pass.");
             }
             if (profile.Status != HttpStatusCode.OK)
             {
-                throw new AuthException("Could not load the Minecraft profile (HTTP " + (int)profile.Status + ").");
+                throw new AuthException("Could not load the Minecraft profile (HTTP " + (int)profile.Status + "). " + DescribeError(profile.Body));
             }
 
             var account = new Account

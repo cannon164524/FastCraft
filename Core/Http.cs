@@ -47,6 +47,7 @@ namespace FastCraft.Core
                 {
                     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
                 }
+                request.Headers.Accept.ParseAdd("application/json");
                 using (var response = await Client.SendAsync(request, cancellationToken).ConfigureAwait(false))
                 {
                     var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

@@ -135,6 +135,10 @@ FastCraft is not affiliated with Mojang or Microsoft. It contains no game code: 
 from Mojang's public CDN after you sign in with an account that owns the game, and it refuses to continue when the
 account does not own Minecraft: Java Edition. Do not use it to play without a licence.
 
+Ownership is confirmed with the account's Minecraft: Java Edition profile: `/minecraft/profile` answers 404 for an
+account without the game, and that account is refused. The older `/entitlements/mcstore` check is not used — it now
+answers HTTP 401 even for accounts that own the game.
+
 The sign-in uses Prism Launcher's public Azure app id `c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb` — a public client
 in the Microsoft Accounts tenant with the device code flow enabled. The old Xbox Live id `00000000402b5328`
 that many launchers used for years was retired and now answers `AADSTS700016`. If the current id is retired too,
