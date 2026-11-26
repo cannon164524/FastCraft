@@ -113,8 +113,8 @@ namespace FastCraft.Game
             {
                 var indexDir = Path.Combine(Locations.Assets, "indexes");
                 Directory.CreateDirectory(indexDir);
-                var indexId = string.IsNullOrEmpty(version.AssetIndex.Id) ? version.AssetsId : version.AssetIndex.Id;
-                indexFile = Path.Combine(indexDir, (indexId ?? "legacy") + ".json");
+                var assetIndexId = string.IsNullOrEmpty(version.AssetIndex.Id) ? version.AssetsId : version.AssetIndex.Id;
+                indexFile = Path.Combine(indexDir, (assetIndexId ?? "legacy") + ".json");
                 batch.Add(new DownloadItem
                 {
                     Url = version.AssetIndex.Url,
