@@ -68,6 +68,15 @@
                     IsEnabled="False" Click="CancelButton_Click"/>
             <Button x:Name="FolderButton" Content="Open game folder" Padding="16,10" Margin="10,0,0,0"
                     Click="FolderButton_Click"/>
+            <CheckBox x:Name="OfflineCheck" Content="Offline mode" Margin="16,0,0,0" VerticalAlignment="Center"
+                      Checked="OfflineCheck_Changed" Unchecked="OfflineCheck_Changed"/>
+            <TextBox x:Name="OfflineNameBox" Width="120" Height="28" Margin="8,0,0,0"
+                     VerticalContentAlignment="Center" IsEnabled="False"
+                     TextChanged="OfflineNameBox_TextChanged"
+                     ToolTip="Player name for offline play: 3-16 letters, digits or _"/>
+            <TextBlock x:Name="OfflineHint" Margin="12,0,0,0" VerticalAlignment="Center" MaxWidth="210"
+                       TextWrapping="Wrap" Foreground="#B45309" Visibility="Collapsed"
+                       Text="Single player and LAN only — online servers and Realms need a sign-in."/>
         </StackPanel>
 
         <!-- Progress -->

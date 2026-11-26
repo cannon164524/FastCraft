@@ -2,9 +2,10 @@
 
 A small, fast launcher for **Minecraft: Java Edition** on Windows, written in C# / WPF on .NET 8.
 
-FastCraft only launches official Mojang versions (releases, and snapshots if you tick the box), and it only
-works with a Microsoft account that actually **owns** Minecraft: Java Edition. There is no offline mode and no
-piracy support — the ownership check is part of the sign-in.
+FastCraft only launches official Mojang versions (releases, and snapshots if you tick the box). Online play needs a
+Microsoft account that actually **owns** Minecraft: Java Edition — the ownership check is part of the sign-in, and
+FastCraft never fakes a session. For single player there is an **offline profile** (a local nickname), which is what
+you use while Microsoft's sign-in is unavailable; it cannot join online servers or Realms.
 
 ## Why it is fast
 
@@ -83,13 +84,28 @@ The result is in `bin\Release\net8.0-windows\win-x64\publish\FastCraft.exe`.
 2. Pick a version (tick **Show snapshots** for snapshots).
 3. Press **Launch Minecraft**. On the first launch it downloads the version, libraries, natives and assets; after
    that, launching only checks what changed.
+4. **Without signing in**: tick **Offline mode**, type a player name, and press Launch — see below.
+
+### Offline mode
+
+Sign-in can be unavailable for reasons that have nothing to do with the game itself, so FastCraft can start
+Minecraft with a local profile instead:
+
+- The name is turned into the same UUID Java gives an offline player (`UUID.nameUUIDFromBytes("OfflinePlayer:<name>")`,
+  a version-3 UUID), so a world you create offline is still yours when you later sign in with that name.
+- The session handed to the game is a placeholder and `--xuid` / `--clientId` are left out: nothing pretends to be a
+  Microsoft session.
+- **Single player and LAN only.** Online servers, Realms, skins and chat signing need a real session and refuse an
+  offline player. That is not a limitation FastCraft can work around, and it does not try.
+- Game files still come from Mojang's CDN. This mode does not license the game: it is for playing a copy you own
+  when Microsoft's sign-in is unavailable.
+
+### When sign-in fails
 
 If signing in says *"Microsoft sign-in could not be started (HTTP 400)"*, Microsoft rejected FastCraft's app id
 (the message now includes Microsoft's own error text; `AADSTS700016` means the id no longer exists). Register your
 own Azure app — Microsoft Accounts tenant, public client, device code flow — and put its id in
 `AuthService.ClientId` in `Auth/AuthService.cs`.
-
-### When sign-in fails
 
 Mojang rate-limits the Minecraft sign-in endpoints hard, so **every attempt costs requests**, and repeated tries
 push the wait out. FastCraft therefore keeps each run as small as it can:
@@ -186,6 +202,9 @@ Ownership is confirmed with the account's Minecraft: Java Edition profile: `/min
 account without the game, and that account is refused. `/entitlements/mcstore` is not needed for that, but FastCraft
 asks it once after a failed sign-in, because its answer separates a token Minecraft refuses from a profile call it
 refuses.
+
+The offline profile is there so that an owner can play single player while Microsoft's sign-in is unavailable. It
+verifies nothing and grants no online access, and it is not a licence: use it with a copy of the game you own.
 
 The sign-in uses Prism Launcher's public Azure app id `c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb` — a public client
 in the Microsoft Accounts tenant with the device code flow enabled. The old Xbox Live id `00000000402b5328`

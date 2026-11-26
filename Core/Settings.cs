@@ -17,6 +17,8 @@ namespace FastCraft.Core
         [JsonPropertyName("keepLauncherOpen")] public bool KeepLauncherOpen { get; set; } = true;
         [JsonPropertyName("checkForUpdates")] public bool CheckForUpdates { get; set; } = true;
         [JsonPropertyName("showSnapshots")] public bool ShowSnapshots { get; set; } = false;
+        [JsonPropertyName("useOffline")] public bool UseOffline { get; set; } = false;
+        [JsonPropertyName("offlineName")] public string OfflineName { get; set; } = "";
 
         public static Settings Load(string path)
         {

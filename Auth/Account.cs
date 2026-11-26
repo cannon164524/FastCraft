@@ -16,6 +16,51 @@ namespace FastCraft.Auth
         [JsonPropertyName("xuid")] public string Xuid { get; set; } = "";
         [JsonPropertyName("expiresAt")] public DateTime ExpiresAt { get; set; }
 
+        /// <summary>
+        /// True for a local offline profile: a nickname with no Microsoft session behind it. Such
+        /// a player can play single player and LAN, and online servers refuse it — that is the
+        /// whole point of the distinction, so nothing here is signed in.
+        /// </summary>
+        [JsonPropertyName("offline")] public bool Offline { get; set; }
+
+        public static Account CreateOffline(string name)
+        {
+            return new Account
+            {
+                Name = name,
+                Uuid = OfflineUuid(name),
+                AccessToken = "0",
+                Xuid = "",
+                Offline = true,
+                ExpiresAt = DateTime.MaxValue
+            };
+        }
+
+        /// <summary>
+        /// The UUID the game gives an offline player: a version-3 (MD5) UUID of
+        /// "OfflinePlayer:" + name, exactly as java.util.UUID.nameUUIDFromBytes builds it. Using
+        /// the same name therefore always means the same player, so worlds keep their data.
+        /// </summary>
+        public static string OfflineUuid(string name)
+        {
+            byte[] hash;
+            using (var md5 = MD5.Create())
+            {
+                hash = md5.ComputeHash(Encoding.UTF8.GetBytes("OfflinePlayer:" + (name ?? "")));
+            }
+            hash[6] = (byte)((hash[6] & 0x0F) | 0x30);
+            hash[8] = (byte)((hash[8] & 0x3F) | 0x80);
+
+            var hex = new StringBuilder(32);
+            for (int i = 0; i < hash.Length; i++)
+            {
+                hex.Append(hash[i].ToString("x2"));
+            }
+            var text = hex.ToString();
+            return text.Substring(0, 8) + "-" + text.Substring(8, 4) + "-" + text.Substring(12, 4)
+                 + "-" + text.Substring(16, 4) + "-" + text.Substring(20, 12);
+        }
+
         [JsonIgnore]
         public bool IsExpired
         {

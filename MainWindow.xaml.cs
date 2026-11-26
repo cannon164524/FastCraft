@@ -101,6 +101,9 @@ namespace FastCraft
             KeepOpenCheck.IsChecked = _settings.KeepLauncherOpen;
             SnapshotsCheck.IsChecked = _settings.ShowSnapshots;
             CheckUpdatesCheck.IsChecked = _settings.CheckForUpdates;
+            OfflineCheck.IsChecked = _settings.UseOffline;
+            OfflineNameBox.Text = _settings.OfflineName ?? "";
+            UpdateOfflineUi();
         }
 
         private void Log(string message)
@@ -368,6 +371,50 @@ namespace FastCraft
             Log("Signed out.");
         }
 
+        private void OfflineCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_ready) return;
+            _settings.UseOffline = OfflineCheck.IsChecked == true;
+            _settings.Save(Locations.SettingsPath);
+            UpdateOfflineUi();
+            if (_settings.UseOffline)
+            {
+                Log("Offline mode is on: single player and LAN only. Online servers and Realms need a Microsoft sign-in.");
+            }
+        }
+
+        private void OfflineNameBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            if (!_ready) return;
+            _settings.OfflineName = (OfflineNameBox.Text ?? "").Trim();
+            _settings.Save(Locations.SettingsPath);
+        }
+
+        private void UpdateOfflineUi()
+        {
+            if (OfflineCheck == null || OfflineNameBox == null) return;
+            var offline = OfflineCheck.IsChecked == true;
+            OfflineNameBox.IsEnabled = offline;
+            OfflineHint.Visibility = offline ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Minecraft names are 3-16 characters of a-z, A-Z, 0-9 and underscore. The same rule is
+        /// applied to an offline name, so a world made offline keeps working when its owner later
+        /// signs in with the real account of that name.
+        /// </summary>
+        private static bool IsValidPlayerName(string name)
+        {
+            if (string.IsNullOrEmpty(name) || name.Length < 3 || name.Length > 16) return false;
+            foreach (var character in name)
+            {
+                var allowed = (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z')
+                           || (character >= '0' && character <= '9') || character == '_';
+                if (!allowed) return false;
+            }
+            return true;
+        }
+
         private async void RefreshVersionsButton_Click(object sender, RoutedEventArgs e)
         {
             if (_busy) return;
@@ -386,10 +433,33 @@ namespace FastCraft
         {
             if (_busy) return;
 
-            if (_account == null)
+            // Which player gets launched: an offline profile when offline mode is ticked, the
+            // signed-in Microsoft account otherwise.
+            Account launchAccount;
+            if (OfflineCheck.IsChecked == true)
+            {
+                var name = (OfflineNameBox.Text ?? "").Trim();
+                if (!IsValidPlayerName(name))
+                {
+                    Log("Offline mode needs a player name of 3-16 letters, digits or underscores.");
+                    MessageBox.Show(this, "Pick a player name for offline mode: 3-16 letters, digits or underscores.",
+                        "Offline mode", MessageBoxButton.OK, MessageBoxImage.Information);
+                    OfflineNameBox.Focus();
+                    return;
+                }
+                launchAccount = Account.CreateOffline(name);
+                Log("Offline mode: playing as " + name
+                    + ". Single player and LAN work; online servers and Realms refuse an offline player.");
+            }
+            else if (_account != null)
+            {
+                launchAccount = _account;
+            }
+            else
             {
                 await SignInAsync();
                 if (_account == null) return;
+                launchAccount = _account;
             }
 
             var summary = SelectedVersion();
@@ -409,19 +479,20 @@ namespace FastCraft
 
             try
             {
-                if (_account.IsExpired)
+                if (!launchAccount.Offline && launchAccount.IsExpired)
                 {
                     Log("Refreshing your Microsoft session…");
-                    _account = await _auth.RefreshAsync(_account, _cts.Token);
+                    _account = await _auth.RefreshAsync(launchAccount, _cts.Token);
                     _account.Save(Locations.AccountPath);
                     UpdateAccountUi();
+                    launchAccount = _account;
                 }
 
                 var versionPath = await _versions.EnsureVersionJsonAsync(summary, _downloader, _cts.Token);
                 var version = VersionParser.Parse(File.ReadAllText(versionPath));
 
                 Log("Launching " + version.Id + "…");
-                var process = await _launcher.LaunchAsync(version, _account, _settings, Log, _cts.Token);
+                var process = await _launcher.LaunchAsync(version, launchAccount, _settings, Log, _cts.Token);
                 Log("Minecraft is running (process " + process.Id + ").");
                 StatusText.Text = "Minecraft is running.";
             }

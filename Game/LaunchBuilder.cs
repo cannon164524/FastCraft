@@ -106,7 +106,29 @@ namespace FastCraft.Game
                 }
             }
 
+            if (account.Offline)
+            {
+                // An offline profile has no Xbox identity, so the game must not be handed one.
+                DropOption(plan.GameArgs, "--xuid");
+                DropOption(plan.GameArgs, "--clientid");
+            }
+
             return plan;
+        }
+
+        /// <summary>
+        /// Removes an option and its value from a command line. Only the first occurrence is
+        /// dropped, which is all the version files ever have.
+        /// </summary>
+        private static void DropOption(List<string> arguments, string name)
+        {
+            for (int i = 0; i < arguments.Count; i++)
+            {
+                if (!string.Equals(arguments[i], name, StringComparison.OrdinalIgnoreCase)) continue;
+                if (i + 1 < arguments.Count) arguments.RemoveAt(i + 1);
+                arguments.RemoveAt(i);
+                return;
+            }
         }
 
         private static Dictionary<string, bool> DefaultFeatures()
@@ -154,7 +176,7 @@ namespace FastCraft.Game
                 .Replace("${auth_access_token}", token)
                 .Replace("${clientid}", AuthService.ClientId)
                 .Replace("${auth_xuid}", account.Xuid ?? "")
-                .Replace("${user_type}", "msa")
+                .Replace("${user_type}", account.Offline ? "legacy" : "msa")
                 .Replace("${version_type}", version.Type ?? "release")
                 .Replace("${user_properties}", "{}")
                 .Replace("${resolution_width}", "854")
