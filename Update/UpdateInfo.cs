@@ -13,4 +13,15 @@ namespace FastCraft.Update
         public long Size;
         public string Notes;
     }
+
+    /// <summary>
+    /// The outcome of an update check: what was found, and a message for the log — including
+    /// the case where GitHub answers 404 because the repository is private.
+    /// </summary>
+    public sealed class UpdateCheck
+    {
+        public UpdateInfo Info;
+        public string Message;
+        public bool Failed;
+    }
 }

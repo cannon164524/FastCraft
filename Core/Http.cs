@@ -59,10 +59,16 @@ namespace FastCraft.Core
         public static async Task<(HttpStatusCode Status, string Body)> PostJsonAsync(string url, string json, CancellationToken cancellationToken)
         {
             using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-            using (var response = await Client.PostAsync(url, content, cancellationToken).ConfigureAwait(false))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content })
             {
-                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                return (response.StatusCode, body);
+                // Xbox Live wants the contract version on its JSON endpoints; without it the
+                // returned tokens can be ones the Minecraft API then rejects.
+                request.Headers.TryAddWithoutValidation("x-xbl-contract-version", "1");
+                using (var response = await Client.SendAsync(request, cancellationToken).ConfigureAwait(false))
+                {
+                    var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    return (response.StatusCode, body);
+                }
             }
         }
 

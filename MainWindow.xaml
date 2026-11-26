@@ -132,6 +132,8 @@
                                   Checked="SettingsCheck_Changed" Unchecked="SettingsCheck_Changed"/>
                         <CheckBox x:Name="CheckUpdatesCheck" Content="Check for updates on startup"
                                   Margin="18,0,0,0" Checked="SettingsCheck_Changed" Unchecked="SettingsCheck_Changed"/>
+                        <Button x:Name="CheckUpdatesButton" Content="Check now" Padding="12,2" Margin="10,0,0,0"
+                                VerticalAlignment="Center" Click="CheckUpdatesButton_Click"/>
                     </WrapPanel>
                 </Grid>
             </Border>

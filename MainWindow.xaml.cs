@@ -69,7 +69,7 @@ namespace FastCraft
 
             _ready = true;
             await ReloadVersionsAsync(false);
-            CheckForUpdatesAsync();
+            _ = CheckForUpdatesAsync(false);
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -214,8 +214,10 @@ namespace FastCraft
             }
         }
 
-        private async void CheckForUpdatesAsync()
+        private async Task CheckForUpdatesAsync(bool manual)
         {
+            if (!_settings.CheckForUpdates && !manual) return;
+
             try
             {
                 if (File.Exists(UpdateService.FailedReportPath))
@@ -237,22 +239,43 @@ namespace FastCraft
             {
             }
 
-            if (!_settings.CheckForUpdates) return;
+            var check = await _updates.CheckAsync(CancellationToken.None);
+            Log("Update check: " + check.Message);
 
+            if (check.Info != null)
+            {
+                if (_updateWindow == null)
+                {
+                    var window = new UpdateWindow(check.Info) { Owner = this };
+                    _updateWindow = window;
+                    window.Closed += delegate { _updateWindow = null; };
+                    window.Show();
+                }
+                return;
+            }
+
+            if (manual)
+            {
+                MessageBox.Show(this, check.Message, "FastCraft updates", MessageBoxButton.OK,
+                    check.Failed ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+        }
+
+        private async void CheckUpdatesButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_busy) return;
+            await CheckForUpdatesAsync(true);
+        }
+
+        private static void WriteAuthLog(string message)
+        {
             try
             {
-                var info = await _updates.CheckAsync(CancellationToken.None);
-                if (info == null) return;
-                if (_updateWindow != null) return;
-
-                var window = new UpdateWindow(info) { Owner = this };
-                _updateWindow = window;
-                window.Closed += delegate { _updateWindow = null; };
-                window.Show();
+                var path = Path.Combine(Locations.Root, "auth.log");
+                File.AppendAllText(path, DateTime.Now.ToString("u") + "  " + message + Environment.NewLine);
             }
             catch
             {
-                // No update check on a flaky network; it runs again on the next start.
             }
         }
 
@@ -291,11 +314,13 @@ namespace FastCraft
             catch (AuthException ex)
             {
                 Log("Sign-in failed: " + ex.Message);
+                WriteAuthLog(ex.Message);
                 DeviceCodeText.Text = "";
             }
             catch (Exception ex)
             {
                 Log("Sign-in failed: " + ex.Message);
+                WriteAuthLog(ex.Message);
                 DeviceCodeText.Text = "";
             }
             finally

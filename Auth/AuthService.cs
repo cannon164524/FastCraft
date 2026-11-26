@@ -251,7 +251,12 @@ namespace FastCraft.Auth
             }
             if (profile.Status != HttpStatusCode.OK)
             {
-                throw new AuthException("Could not load the Minecraft profile (HTTP " + (int)profile.Status + "). " + DescribeError(profile.Body));
+                var details = "Could not load the Minecraft profile (HTTP " + (int)profile.Status + "). " + DescribeError(profile.Body);
+                if (!string.IsNullOrEmpty(tokenError))
+                {
+                    details += " Launcher login said: " + tokenError;
+                }
+                throw new AuthException(details);
             }
 
             var account = new Account

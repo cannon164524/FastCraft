@@ -41,19 +41,74 @@ namespace FastCraft.Update
             get { return Path.Combine(Locations.UpdateDir, "update-failed.txt"); }
         }
 
-        public async Task<UpdateInfo> CheckAsync(CancellationToken cancellationToken)
+        public async Task<UpdateCheck> CheckAsync(CancellationToken cancellationToken)
         {
-            using (var request = new HttpRequestMessage(HttpMethod.Get, ReleasesUrl))
+            var result = new UpdateCheck();
+            try
             {
-                request.Headers.Accept.ParseAdd("application/vnd.github+json");
-                using (var response = await Http.Client.SendAsync(request, cancellationToken).ConfigureAwait(false))
+                using (var request = new HttpRequestMessage(HttpMethod.Get, ReleasesUrl))
                 {
-                    if (response.StatusCode == HttpStatusCode.NotFound) return null;
-                    response.EnsureSuccessStatusCode();
-                    var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    return Parse(body);
+                    request.Headers.Accept.ParseAdd("application/vnd.github+json");
+                    using (var response = await Http.Client.SendAsync(request, cancellationToken).ConfigureAwait(false))
+                    {
+                        if (response.StatusCode == HttpStatusCode.NotFound)
+                        {
+                            // GitHub also answers 404 when the repository is private: releases
+                            // are only served anonymously for public repositories.
+                            result.Message = "GitHub has no release data for FastCraft — the repository is private, or no release was published yet.";
+                            return result;
+                        }
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                            result.Failed = true;
+                            result.Message = "GitHub returned HTTP " + (int)response.StatusCode + " when checking for updates. " + DescribeGitHubError(error);
+                            return result;
+                        }
+
+                        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                        var latest = Parse(body);
+                        if (latest == null)
+                        {
+                            result.Failed = true;
+                            result.Message = "GitHub's latest release has no version tag or no FastCraft.exe asset.";
+                            return result;
+                        }
+
+                        if (latest.Version.CompareTo(CurrentVersion) <= 0)
+                        {
+                            result.Message = "FastCraft " + CurrentVersion + " is up to date (latest release: " + latest.Tag + ").";
+                            return result;
+                        }
+
+                        result.Info = latest;
+                        result.Message = "FastCraft " + latest.Tag + " is available (you have " + CurrentVersion + ").";
+                        return result;
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                result.Failed = true;
+                result.Message = "Could not check for updates: " + ex.Message;
+                return result;
+            }
+        }
+
+        private static string DescribeGitHubError(string body)
+        {
+            try
+            {
+                using (var document = JsonDocument.Parse(body))
+                {
+                    var message = JsonHelp.GetString(document.RootElement, "message");
+                    if (!string.IsNullOrEmpty(message)) return message;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+            return "";
         }
 
         private static UpdateInfo Parse(string json)
@@ -90,7 +145,6 @@ namespace FastCraft.Update
                 }
 
                 if (string.IsNullOrEmpty(info.Url)) return null;
-                if (info.Version.CompareTo(CurrentVersion) <= 0) return null;
                 return info;
             }
         }

@@ -88,6 +88,9 @@ If signing in says *"Microsoft sign-in could not be started (HTTP 400)"*, Micros
 own Azure app — Microsoft Accounts tenant, public client, device code flow — and put its id in
 `AuthService.ClientId` in `Auth/AuthService.cs`.
 
+Every sign-in failure is also written to `%APPDATA%\FastCraft\auth.log`, with the HTTP status and the server's
+error text — that file is what to include in a bug report.
+
 ## Updates
 
 Every push to `main` builds FastCraft and publishes it as a GitHub release (`v1.0.<build number>`, with
@@ -98,9 +101,13 @@ exe with it.
 
 - This works from the first build that contains the updater onwards; an older exe without it has to be
   replaced by hand once.
+- **The repository has to be public**: GitHub only serves releases anonymously for public repositories. If the
+  log says *"GitHub has no release data"*, the repository is private — make it public in
+  Settings → General → Danger zone, and the popup starts working on the next start.
 - If the exe cannot be replaced (for example because it sits in `Program Files`), the next start shows a
   message with the folder where the downloaded update is.
-- *Check for updates on startup* can be turned off in the settings.
+- *Check for updates on startup* can be turned off in the settings, and **Check now** runs the check on
+  demand and shows the result.
 - Local builds report version `1.0.0`, so they will offer every published release.
 
 ## Where things are stored
