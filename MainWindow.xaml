@@ -105,7 +105,7 @@
             <!-- pages -->
             <Grid Grid.Column="1" x:Name="PageHost">
 
-                <!-- ---------------------------- play ---------------------------- -->
+                <!-- play page -->
                 <Grid x:Name="PlayPage" Margin="34,30,34,22">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -153,7 +153,7 @@
                     </Border>
                 </Grid>
 
-                <!-- -------------------------- versions -------------------------- -->
+                <!-- versions page -->
                 <Grid x:Name="VersionsPage" Margin="34,30,34,22" Visibility="Collapsed">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -178,7 +178,7 @@
                     </Border>
                 </Grid>
 
-                <!-- -------------------------- settings -------------------------- -->
+                <!-- settings page -->
                 <Grid x:Name="SettingsPage" Margin="34,30,34,22" Visibility="Collapsed">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -255,7 +255,7 @@
                     </Border>
                 </Grid>
 
-                <!-- ----------------------------- log ---------------------------- -->
+                <!-- log page -->
                 <Grid x:Name="LogPage" Margin="34,30,34,22" Visibility="Collapsed">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

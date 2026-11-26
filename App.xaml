@@ -317,8 +317,8 @@
                             <Border x:Name="Box" Width="16" Height="16" CornerRadius="4" Margin="0,1,0,0"
                                     Background="Transparent" BorderBrush="{StaticResource Brush.Line}"
                                     BorderThickness="1.4" VerticalAlignment="Center">
-                                <Canvas Width="16" Height="16">
-                                    <Path x:Name="Mark" Data="M 4,8.4 L 6.8,11.2 L 12,5.6"
+                                <Canvas Width="12" Height="12">
+                                    <Path x:Name="Mark" Data="M 3,6.2 L 5,8.2 L 9,3.8"
                                           Stroke="{StaticResource Brush.Accent}" StrokeThickness="1.9"
                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity="0"/>
                                 </Canvas>
