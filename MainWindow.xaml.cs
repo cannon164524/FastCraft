@@ -288,6 +288,24 @@ namespace FastCraft
             DeviceCodeText.Text = "";
             try
             {
+                // A saved session that still works is checked first: reusing it costs one
+                // request instead of a whole Microsoft sign-in, which Mojang throttles.
+                if (_account != null && !string.IsNullOrEmpty(_account.AccessToken))
+                {
+                    SetBusy(true, "Checking your saved session…");
+                    var reused = await _auth.ReuseAsync(_account, token);
+                    if (reused != null)
+                    {
+                        _account = reused;
+                        _account.Save(Locations.AccountPath);
+                        UpdateAccountUi();
+                        Log("Using the saved session for " + _account.Name + "; no new Microsoft sign-in needed.");
+                        StatusText.Text = "Signed in as " + _account.Name + ".";
+                        return;
+                    }
+                }
+
+                StatusText.Text = "Starting Microsoft sign-in…";
                 var code = await _auth.StartDeviceCodeAsync(token);
                 DeviceCodeText.Text = "Enter code " + code.UserCode + " at " + code.VerificationUri;
                 Log("A browser will open. Enter the code " + code.UserCode + " at " + code.VerificationUri + " and sign in with the Microsoft account that owns Minecraft.");

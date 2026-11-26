@@ -78,7 +78,8 @@ The result is in `bin\Release\net8.0-windows\win-x64\publish\FastCraft.exe`.
 ## Using it
 
 1. Press **Sign in with Microsoft**. A browser opens; enter the code shown in the window and sign in with the
-   account that owns Minecraft. FastCraft checks ownership and loads your Minecraft name and UUID.
+   account that owns Minecraft. FastCraft checks ownership and loads your Minecraft name and UUID. Later starts
+   reuse the saved session instead of asking again.
 2. Pick a version (tick **Show snapshots** for snapshots).
 3. Press **Launch Minecraft**. On the first launch it downloads the version, libraries, natives and assets; after
    that, launching only checks what changed.
@@ -88,10 +89,27 @@ If signing in says *"Microsoft sign-in could not be started (HTTP 400)"*, Micros
 own Azure app — Microsoft Accounts tenant, public client, device code flow — and put its id in
 `AuthService.ClientId` in `Auth/AuthService.cs`.
 
+### When sign-in fails
+
+Mojang rate-limits the Minecraft sign-in endpoints hard, so **every attempt costs requests**, and repeated tries
+push the wait out. FastCraft therefore keeps each run as small as it can:
+
+- **A saved session is reused.** The stored Minecraft token is checked against `/minecraft/profile` first and only
+  refreshed when that is refused, so a normal start costs one request instead of a whole Microsoft sign-in.
+- **One token request per route.** `/launcher/login` — the endpoint Mojang's own launcher and Prism use — is asked
+  once, the profile is then asked for once more if the first answer is a refusal (a just-issued token is sometimes
+  refused once while it propagates), and the older `login_with_xbox` endpoint only runs as a fallback.
+- **HTTP 429 stops everything.** When any answer is 429, FastCraft records when the wait ends in
+  `%APPDATA%\FastCraft\cache\auth-throttle.txt` and refuses to send another request until then, naming the
+  remaining minutes in the message.
+
+So if it says *"Mojang is throttling sign-in"*, wait the minutes it names — about half an hour after several failed
+attempts — then press Sign in with Microsoft **once**. A plain `HTTP 401` from `/minecraft/profile` with an empty
+body is what Mojang returns while it throttles; it does not mean the account is wrong.
+
 Every sign-in step is also written to `%APPDATA%\FastCraft\auth.log` with its HTTP status and the server's
-error text (`Device code`, `Xbox Live`, `XSTS`, `Launcher login`, `login_with_xbox`, `Profile`), never a token.
-That file is what to include in a bug report. FastCraft tries both token endpoints and uses the first whose
-profile loads, so one rejected route cannot block sign-in; the window title shows the version you are running.
+error text (`Device code`, `Xbox Live`, `XSTS`, `Launcher login`, `Profile`, `login_with_xbox`), never a token.
+That file is what to include in a bug report; the window title shows the version you are running.
 
 ## Updates
 

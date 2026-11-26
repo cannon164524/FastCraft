@@ -8,6 +8,29 @@ using System.Threading.Tasks;
 
 namespace FastCraft.Core
 {
+    /// <summary>
+    /// One HTTP answer as the sign-in needs it: the status, the body, and how long the server
+    /// asked us to wait (Retry-After). Mojang sends Retry-After when it throttles sign-in.
+    /// </summary>
+    public readonly struct HttpResult
+    {
+        public HttpResult(HttpStatusCode status, string body, double retryAfterSeconds)
+        {
+            Status = status;
+            Body = body ?? "";
+            RetryAfterSeconds = retryAfterSeconds;
+        }
+
+        public readonly HttpStatusCode Status;
+        public readonly string Body;
+        public readonly double RetryAfterSeconds;
+
+        public int Code { get { return (int)Status; } }
+        public bool IsOk { get { return Status == HttpStatusCode.OK; } }
+        public bool IsRateLimited { get { return (int)Status == 429; } }
+        public bool IsUnauthorized { get { return Status == HttpStatusCode.Unauthorized; } }
+    }
+
     public static class Http
     {
         public static readonly HttpClient Client = CreateClient();
@@ -39,7 +62,7 @@ namespace FastCraft.Core
             }
         }
 
-        public static async Task<(HttpStatusCode Status, string Body)> GetAsync(string url, string bearerToken, CancellationToken cancellationToken)
+        public static async Task<HttpResult> GetAsync(string url, string bearerToken, CancellationToken cancellationToken)
         {
             using (var request = new HttpRequestMessage(HttpMethod.Get, url))
             {
@@ -51,12 +74,12 @@ namespace FastCraft.Core
                 using (var response = await Client.SendAsync(request, cancellationToken).ConfigureAwait(false))
                 {
                     var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    return (response.StatusCode, body);
+                    return new HttpResult(response.StatusCode, body, ReadRetryAfter(response));
                 }
             }
         }
 
-        public static async Task<(HttpStatusCode Status, string Body)> PostJsonAsync(string url, string json, CancellationToken cancellationToken)
+        public static async Task<HttpResult> PostJsonAsync(string url, string json, CancellationToken cancellationToken)
         {
             using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
             using (var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content })
@@ -64,22 +87,34 @@ namespace FastCraft.Core
                 // Xbox Live wants the contract version on its JSON endpoints; without it the
                 // returned tokens can be ones the Minecraft API then rejects.
                 request.Headers.TryAddWithoutValidation("x-xbl-contract-version", "1");
+                request.Headers.Accept.ParseAdd("application/json");
                 using (var response = await Client.SendAsync(request, cancellationToken).ConfigureAwait(false))
                 {
                     var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    return (response.StatusCode, body);
+                    return new HttpResult(response.StatusCode, body, ReadRetryAfter(response));
                 }
             }
         }
 
-        public static async Task<(HttpStatusCode Status, string Body)> PostFormAsync(string url, string form, CancellationToken cancellationToken)
+        public static async Task<HttpResult> PostFormAsync(string url, string form, CancellationToken cancellationToken)
         {
             using (var content = new StringContent(form, Encoding.UTF8, "application/x-www-form-urlencoded"))
             using (var response = await Client.PostAsync(url, content, cancellationToken).ConfigureAwait(false))
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                return (response.StatusCode, body);
+                return new HttpResult(response.StatusCode, body, ReadRetryAfter(response));
             }
+        }
+
+        private static double ReadRetryAfter(HttpResponseMessage response)
+        {
+            var header = response.Headers.RetryAfter;
+            if (header != null)
+            {
+                if (header.Delta.HasValue) return header.Delta.Value.TotalSeconds;
+                if (header.Date.HasValue) return Math.Max(0.0, (header.Date.Value - DateTimeOffset.UtcNow).TotalSeconds);
+            }
+            return 0;
         }
     }
 }

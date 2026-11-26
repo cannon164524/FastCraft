@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -27,6 +29,11 @@ namespace FastCraft.Auth
     /// Microsoft sign-in (device code flow) followed by the Minecraft services exchange:
     /// MSA -> Xbox Live -> XSTS -> Minecraft access token -> ownership check.
     /// Only accounts that actually own Minecraft: Java Edition get through.
+    ///
+    /// Mojang rate-limits the last steps hard (HTTP 429) and every extra attempt extends the
+    /// wait, so each run sends as few requests as it can: one launcher-login token request, one
+    /// quiet retry of the profile, and the older login_with_xbox route only as a fallback. A 429
+    /// anywhere ends the run and is remembered in AuthBackoff.
     /// </summary>
     public sealed class AuthService
     {
@@ -36,6 +43,8 @@ namespace FastCraft.Auth
         public const string ClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
         private const string NoProfileMessage = "This Microsoft account has no Minecraft: Java Edition profile, so it does not own the game. Buy Minecraft: Java Edition at minecraft.net, or start the official launcher once if you play through Xbox Game Pass.";
+
+        private const string RefusedHint = " Mojang refused the Minecraft token, which is usually temporary throttling after several sign-in attempts: wait about half an hour, then start FastCraft and sign in once.";
 
         private const string DeviceCodeUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
         private const string TokenUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
@@ -47,13 +56,16 @@ namespace FastCraft.Auth
 
         public async Task<DeviceCode> StartDeviceCodeAsync(CancellationToken cancellationToken)
         {
+            ThrowIfThrottled();
+
             var form = "client_id=" + Uri.EscapeDataString(ClientId)
                      + "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access");
             var result = await Http.PostFormAsync(DeviceCodeUrl, form, cancellationToken).ConfigureAwait(false);
-            AuthLog.Write("Device code: HTTP " + (int)result.Status);
-            if (result.Status != HttpStatusCode.OK)
+            AuthLog.Write("Device code: HTTP " + result.Code);
+            if (result.IsRateLimited) throw Throttled(result, "Device code");
+            if (!result.IsOk)
             {
-                throw new AuthException("Microsoft sign-in could not be started (HTTP " + (int)result.Status + "). "
+                throw new AuthException("Microsoft sign-in could not be started (HTTP " + result.Code + "). "
                     + DescribeError(result.Body));
             }
 
@@ -89,7 +101,8 @@ namespace FastCraft.Auth
                          + "&device_code=" + Uri.EscapeDataString(code.DeviceCodeValue);
                 var result = await Http.PostFormAsync(TokenUrl, form, cancellationToken).ConfigureAwait(false);
 
-                if (result.Status == HttpStatusCode.OK)
+                if (result.IsRateLimited) throw Throttled(result, "Token poll");
+                if (result.IsOk)
                 {
                     return ParseToken(result.Body);
                 }
@@ -123,6 +136,8 @@ namespace FastCraft.Auth
 
         public async Task<Account> CompleteLoginAsync(TokenResult token, CancellationToken cancellationToken)
         {
+            ThrowIfThrottled();
+
             // 1. Xbox Live
             var xblBody = new JsonObject
             {
@@ -136,10 +151,11 @@ namespace FastCraft.Auth
                 ["TokenType"] = "JWT"
             };
             var xblResult = await Http.PostJsonAsync(XblUrl, xblBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
-            AuthLog.Write("Xbox Live: HTTP " + (int)xblResult.Status);
-            if (xblResult.Status != HttpStatusCode.OK)
+            AuthLog.Write("Xbox Live: HTTP " + xblResult.Code);
+            if (xblResult.IsRateLimited) throw Throttled(xblResult, "Xbox Live");
+            if (!xblResult.IsOk)
             {
-                throw new AuthException("Xbox Live sign-in failed (HTTP " + (int)xblResult.Status + ").");
+                throw new AuthException("Xbox Live sign-in failed (HTTP " + xblResult.Code + "). " + DescribeError(xblResult.Body));
             }
             string xblToken;
             using (var document = JsonDocument.Parse(xblResult.Body))
@@ -165,8 +181,11 @@ namespace FastCraft.Auth
                 ["TokenType"] = "JWT"
             };
             var xstsResult = await Http.PostJsonAsync(XstsUrl, xstsBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
+            if (xstsResult.IsRateLimited) throw Throttled(xstsResult, "XSTS");
+
             string xstsToken = null;
             string uhs = null;
+            string xuid = null;
             long xerr = 0;
             using (var document = JsonDocument.Parse(xstsResult.Body))
             {
@@ -181,12 +200,8 @@ namespace FastCraft.Auth
                     {
                         foreach (var item in xui.EnumerateArray())
                         {
-                            var claim = JsonHelp.GetString(item, "uhs");
-                            if (!string.IsNullOrEmpty(claim))
-                            {
-                                uhs = claim;
-                                break;
-                            }
+                            if (string.IsNullOrEmpty(uhs)) uhs = JsonHelp.GetString(item, "uhs");
+                            if (string.IsNullOrEmpty(xuid)) xuid = JsonHelp.GetString(item, "xid");
                         }
                     }
                 }
@@ -194,36 +209,38 @@ namespace FastCraft.Auth
 
             if (string.IsNullOrEmpty(xstsToken) || string.IsNullOrEmpty(uhs))
             {
-                AuthLog.Write("XSTS: HTTP " + (int)xstsResult.Status + ", XErr=" + xerr);
+                AuthLog.Write("XSTS: HTTP " + xstsResult.Code + ", XErr=" + xerr);
                 throw new AuthException(DescribeXstsError(xerr));
             }
-            AuthLog.Write("XSTS: HTTP " + (int)xstsResult.Status + ", XErr=0, uhs length " + uhs.Length);
-            var xuid = uhs;
+            // The user hash is not the account id: --xuid wants the xid claim, and the user hash
+            // is only the fallback when the claim is missing.
+            if (string.IsNullOrEmpty(xuid)) xuid = uhs;
+            AuthLog.Write("XSTS: HTTP " + xstsResult.Code + ", XErr=0, uhs length " + uhs.Length);
 
-            // 3. Minecraft access token and profile. The official launcher's /launcher/login
-            // is tried first, then the older login_with_xbox endpoint; the first token whose
-            // profile loads is used, so a route that hands back a rejected token cannot
-            // block sign-in.
+            // 3. Minecraft access token and profile. The official launcher's /launcher/login is
+            // the route Mojang's own launcher and Prism use and is tried once; the older
+            // login_with_xbox endpoint is heavily rate limited and only runs as a fallback.
             var xToken = "XBL3.0 x=" + uhs + ";" + xstsToken;
             string mcToken = null;
             long expiresIn = 0;
             string profileBody = null;
-            string failure = "";
+            var failures = new List<string>();
 
             var launcherBody = new JsonObject { ["xtoken"] = xToken, ["platform"] = "PC_LAUNCHER" };
             var launcherResult = await Http.PostJsonAsync(McLauncherLoginUrl, launcherBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
-            AuthLog.Write("Launcher login: HTTP " + (int)launcherResult.Status);
+            AuthLog.Write("Launcher login: HTTP " + launcherResult.Code);
+            if (launcherResult.IsRateLimited) throw Throttled(launcherResult, "Launcher login");
 
             var launcherToken = ReadMinecraftToken(launcherResult, out expiresIn);
             if (string.IsNullOrEmpty(launcherToken))
             {
-                failure = "Launcher login HTTP " + (int)launcherResult.Status + ": " + DescribeError(launcherResult.Body);
+                failures.Add("Launcher login HTTP " + launcherResult.Code + ": " + DescribeError(launcherResult.Body));
             }
             else
             {
                 var profile = await Http.GetAsync(McProfileUrl, "Bearer " + launcherToken, cancellationToken).ConfigureAwait(false);
-                AuthLog.Write("Profile (launcher login token): HTTP " + (int)profile.Status + " " + DescribeError(profile.Body));
-                if (profile.Status == HttpStatusCode.OK)
+                AuthLog.Write("Profile (launcher login token): HTTP " + profile.Code + " " + DescribeError(profile.Body));
+                if (profile.IsOk)
                 {
                     mcToken = launcherToken;
                     profileBody = profile.Body;
@@ -232,29 +249,58 @@ namespace FastCraft.Auth
                 {
                     throw new AuthException(NoProfileMessage);
                 }
+                else if (profile.IsRateLimited)
+                {
+                    throw Throttled(profile, "Profile");
+                }
                 else
                 {
-                    failure = "Profile HTTP " + (int)profile.Status + ": " + DescribeError(profile.Body);
+                    // A token that was just issued is occasionally refused once while it
+                    // propagates, so the profile is asked for one more time before the
+                    // fallback route is used.
+                    await Task.Delay(2000, cancellationToken).ConfigureAwait(false);
+                    var retry = await Http.GetAsync(McProfileUrl, "Bearer " + launcherToken, cancellationToken).ConfigureAwait(false);
+                    AuthLog.Write("Profile retry (launcher login token): HTTP " + retry.Code + " " + DescribeError(retry.Body));
+                    if (retry.IsOk)
+                    {
+                        mcToken = launcherToken;
+                        profileBody = retry.Body;
+                    }
+                    else if (retry.Status == HttpStatusCode.NotFound)
+                    {
+                        throw new AuthException(NoProfileMessage);
+                    }
+                    else if (retry.IsRateLimited)
+                    {
+                        throw Throttled(retry, "Profile");
+                    }
+                    else
+                    {
+                        failures.Add("Profile HTTP " + retry.Code + ": " + DescribeError(retry.Body));
+                    }
                 }
             }
 
             if (string.IsNullOrEmpty(profileBody))
             {
+                ThrowIfThrottled();
+
                 var loginBody = new JsonObject { ["identityToken"] = xToken };
                 var loginResult = await Http.PostJsonAsync(McLoginWithXboxUrl, loginBody.ToJsonString(), cancellationToken).ConfigureAwait(false);
-                AuthLog.Write("login_with_xbox: HTTP " + (int)loginResult.Status);
+                AuthLog.Write("login_with_xbox: HTTP " + loginResult.Code);
+                if (loginResult.IsRateLimited) throw Throttled(loginResult, "login_with_xbox");
 
                 long xboxExpires;
                 var xboxToken = ReadMinecraftToken(loginResult, out xboxExpires);
                 if (string.IsNullOrEmpty(xboxToken))
                 {
-                    failure = failure + " / login_with_xbox HTTP " + (int)loginResult.Status + ": " + DescribeError(loginResult.Body);
+                    failures.Add("login_with_xbox HTTP " + loginResult.Code + ": " + DescribeError(loginResult.Body));
                 }
                 else
                 {
                     var profile = await Http.GetAsync(McProfileUrl, "Bearer " + xboxToken, cancellationToken).ConfigureAwait(false);
-                    AuthLog.Write("Profile (login_with_xbox token): HTTP " + (int)profile.Status + " " + DescribeError(profile.Body));
-                    if (profile.Status == HttpStatusCode.OK)
+                    AuthLog.Write("Profile (login_with_xbox token): HTTP " + profile.Code + " " + DescribeError(profile.Body));
+                    if (profile.IsOk)
                     {
                         mcToken = xboxToken;
                         expiresIn = xboxExpires;
@@ -264,21 +310,26 @@ namespace FastCraft.Auth
                     {
                         throw new AuthException(NoProfileMessage);
                     }
+                    else if (profile.IsRateLimited)
+                    {
+                        throw Throttled(profile, "Profile");
+                    }
                     else
                     {
-                        failure = failure + " / Profile HTTP " + (int)profile.Status + ": " + DescribeError(profile.Body);
+                        failures.Add("Profile HTTP " + profile.Code + ": " + DescribeError(profile.Body));
                     }
                 }
             }
 
             if (string.IsNullOrEmpty(profileBody) || string.IsNullOrEmpty(mcToken))
             {
-                throw new AuthException("Could not sign in to Minecraft. " + failure);
+                // Both routes refused: hold off instead of letting repeated clicks make it worse.
+                AuthBackoff.Register(300);
+                throw new AuthException("Could not sign in to Minecraft. " + string.Join(" / ", failures) + RefusedHint);
             }
 
             // 4. Ownership: a profile exists only for an account with Minecraft: Java
             // Edition (or Xbox Game Pass), and /minecraft/profile answers 404 otherwise.
-            // The old /entitlements/mcstore check now answers 401, so it is not used.
             var account = new Account
             {
                 AccessToken = mcToken,
@@ -286,16 +337,60 @@ namespace FastCraft.Auth
                 Xuid = xuid,
                 ExpiresAt = DateTime.UtcNow.AddSeconds(expiresIn > 0 ? expiresIn : 86400)
             };
-            using (var document = JsonDocument.Parse(profileBody))
-            {
-                account.Name = JsonHelp.GetString(document.RootElement, "name");
-                account.Uuid = JsonHelp.GetString(document.RootElement, "id");
-            }
+            ApplyProfile(account, profileBody);
             if (string.IsNullOrEmpty(account.Name) || string.IsNullOrEmpty(account.Uuid))
             {
                 throw new AuthException("Minecraft returned an incomplete profile.");
             }
+
+            // A working token proves the connection is not being throttled.
+            AuthBackoff.Clear();
             return account;
+        }
+
+        /// <summary>
+        /// Reuses a saved session instead of a whole new Microsoft sign-in: the stored Minecraft
+        /// token is checked against /minecraft/profile, and only refreshed when it is refused.
+        /// Returns null when the caller has to sign in, and never throws for a refused token, so
+        /// a stale session cannot block signing in.
+        /// </summary>
+        public async Task<Account> ReuseAsync(Account account, CancellationToken cancellationToken)
+        {
+            if (account == null || string.IsNullOrEmpty(account.AccessToken)) return null;
+
+            HttpResult profile;
+            try
+            {
+                profile = await Http.GetAsync(McProfileUrl, "Bearer " + account.AccessToken, cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                // Offline or a dead connection: report nothing usable and let the caller decide.
+                return null;
+            }
+            AuthLog.Write("Saved session: HTTP " + profile.Code + " " + DescribeError(profile.Body));
+            if (profile.IsOk)
+            {
+                ApplyProfile(account, profile.Body);
+                return account;
+            }
+            if (profile.IsRateLimited || AuthBackoff.IsActive)
+            {
+                return null;
+            }
+            if (string.IsNullOrEmpty(account.RefreshToken))
+            {
+                return null;
+            }
+
+            try
+            {
+                return await RefreshAsync(account, cancellationToken).ConfigureAwait(false);
+            }
+            catch (AuthException)
+            {
+                return null;
+            }
         }
 
         public async Task<Account> RefreshAsync(Account account, CancellationToken cancellationToken)
@@ -304,12 +399,14 @@ namespace FastCraft.Auth
             {
                 throw new AuthException("No saved Microsoft session. Please sign in again.");
             }
+            ThrowIfThrottled();
 
             var form = "grant_type=refresh_token"
                      + "&client_id=" + Uri.EscapeDataString(ClientId)
                      + "&refresh_token=" + Uri.EscapeDataString(account.RefreshToken)
                      + "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access");
             var result = await Http.PostFormAsync(TokenUrl, form, cancellationToken).ConfigureAwait(false);
+            if (result.IsRateLimited) throw Throttled(result, "Token refresh");
 
             string access = null;
             string refresh = null;
@@ -317,7 +414,7 @@ namespace FastCraft.Auth
             {
                 using (var document = JsonDocument.Parse(result.Body))
                 {
-                    if (result.Status == HttpStatusCode.OK)
+                    if (result.IsOk)
                     {
                         access = JsonHelp.GetString(document.RootElement, "access_token");
                         refresh = JsonHelp.GetString(document.RootElement, "refresh_token");
@@ -344,6 +441,46 @@ namespace FastCraft.Auth
                 RefreshToken = string.IsNullOrEmpty(refresh) ? account.RefreshToken : refresh
             };
             return await CompleteLoginAsync(token, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static void ApplyProfile(Account account, string body)
+        {
+            if (string.IsNullOrEmpty(body)) return;
+            try
+            {
+                using (var document = JsonDocument.Parse(body))
+                {
+                    account.Name = JsonHelp.GetString(document.RootElement, "name");
+                    account.Uuid = JsonHelp.GetString(document.RootElement, "id");
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        private static void ThrowIfThrottled()
+        {
+            if (!AuthBackoff.IsActive) return;
+            throw new AuthException("The last attempt was refused or rate limited, so FastCraft is waiting before it sends Mojang another request. Try again in "
+                + WaitText() + ".");
+        }
+
+        private static AuthException Throttled(HttpResult result, string step)
+        {
+            var seconds = result.RetryAfterSeconds > 0 ? result.RetryAfterSeconds : 600;
+            AuthBackoff.Register(seconds);
+            AuthLog.Write(step + ": HTTP 429, no further requests for " + (int)Math.Ceiling(seconds) + " s");
+            return new AuthException("Mojang is throttling sign-in (HTTP 429 at " + step + "). Each extra attempt makes it worse, so FastCraft will not send more requests for "
+                + WaitText() + " — then press Sign in with Microsoft once.");
+        }
+
+        private static string WaitText()
+        {
+            var minutes = AuthBackoff.RemainingMinutes;
+            if (minutes <= 0) return "a few minutes";
+            if (minutes == 1) return "about a minute";
+            return "about " + minutes + " minutes";
         }
 
         private static TokenResult ParseToken(string body)
@@ -379,10 +516,10 @@ namespace FastCraft.Auth
             return "unknown error";
         }
 
-        private static string ReadMinecraftToken((HttpStatusCode Status, string Body) result, out long expiresIn)
+        private static string ReadMinecraftToken(HttpResult result, out long expiresIn)
         {
             expiresIn = 0;
-            if (result.Status != HttpStatusCode.OK) return null;
+            if (!result.IsOk) return null;
             try
             {
                 using (var document = JsonDocument.Parse(result.Body))
@@ -397,13 +534,18 @@ namespace FastCraft.Auth
             }
         }
 
-        private static string DescribeError(string body)        {
+        private static string DescribeError(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return "(empty response)";
             try
             {
                 using (var document = JsonDocument.Parse(body))
                 {
-                    var error = JsonHelp.GetString(document.RootElement, "error");
-                    var description = JsonHelp.GetString(document.RootElement, "error_description");
+                    var root = document.RootElement;
+                    var error = JsonHelp.GetString(root, "error");
+                    if (string.IsNullOrEmpty(error)) error = JsonHelp.GetString(root, "errorType");
+                    var description = JsonHelp.GetString(root, "error_description");
+                    if (string.IsNullOrEmpty(description)) description = JsonHelp.GetString(root, "errorMessage");
                     var parts = "";
                     if (!string.IsNullOrEmpty(error)) parts = error;
                     if (!string.IsNullOrEmpty(description)) parts = string.IsNullOrEmpty(parts) ? description : parts + ": " + description;
@@ -413,8 +555,8 @@ namespace FastCraft.Auth
             }
             catch (JsonException)
             {
+                return Trimmed(body);
             }
-            return "";
         }
 
         private static string DescribeXstsError(long xerr)
