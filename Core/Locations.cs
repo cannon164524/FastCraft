@@ -18,6 +18,7 @@ namespace FastCraft.Core
         public static string Runtime { get { return Path.Combine(Root, "runtime"); } }
         public static string Instances { get { return Path.Combine(Root, "instances"); } }
         public static string CacheDir { get { return Path.Combine(Root, "cache"); } }
+        public static string UpdateDir { get { return Path.Combine(Root, "update"); } }
 
         public static string ManifestPath { get { return Path.Combine(CacheDir, "version_manifest_v2.json"); } }
         public static string HashCachePath { get { return Path.Combine(CacheDir, "verified.json"); } }

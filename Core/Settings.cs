@@ -15,6 +15,7 @@ namespace FastCraft.Core
         [JsonPropertyName("downloadParallelism")] public int DownloadParallelism { get; set; } = 32;
         [JsonPropertyName("turboJvmFlags")] public bool TurboJvmFlags { get; set; } = true;
         [JsonPropertyName("keepLauncherOpen")] public bool KeepLauncherOpen { get; set; } = true;
+        [JsonPropertyName("checkForUpdates")] public bool CheckForUpdates { get; set; } = true;
         [JsonPropertyName("showSnapshots")] public bool ShowSnapshots { get; set; } = false;
 
         public static Settings Load(string path)

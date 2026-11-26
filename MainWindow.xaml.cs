@@ -9,6 +9,7 @@ using System.Windows.Threading;
 using FastCraft.Auth;
 using FastCraft.Core;
 using FastCraft.Game;
+using FastCraft.Update;
 
 namespace FastCraft
 {
@@ -22,10 +23,12 @@ namespace FastCraft
         private readonly Launcher _launcher;
         private readonly VersionService _versions;
         private readonly DispatcherTimer _timer;
+        private readonly UpdateService _updates = new UpdateService();
 
         private VersionManifestData _manifest;
         private List<VersionSummary> _shownVersions = new List<VersionSummary>();
         private Account _account;
+        private UpdateWindow _updateWindow;
         private CancellationTokenSource _cts;
         private bool _busy;
         private bool _ready;
@@ -66,6 +69,7 @@ namespace FastCraft
 
             _ready = true;
             await ReloadVersionsAsync(false);
+            CheckForUpdatesAsync();
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -95,6 +99,7 @@ namespace FastCraft
             TurboCheck.IsChecked = _settings.TurboJvmFlags;
             KeepOpenCheck.IsChecked = _settings.KeepLauncherOpen;
             SnapshotsCheck.IsChecked = _settings.ShowSnapshots;
+            CheckUpdatesCheck.IsChecked = _settings.CheckForUpdates;
         }
 
         private void Log(string message)
@@ -206,6 +211,48 @@ namespace FastCraft
             {
                 AccountText.Text = "Signed in as " + _account.Name;
                 SignOutButton.IsEnabled = true;
+            }
+        }
+
+        private async void CheckForUpdatesAsync()
+        {
+            try
+            {
+                if (File.Exists(UpdateService.FailedReportPath))
+                {
+                    try
+                    {
+                        File.Delete(UpdateService.FailedReportPath);
+                    }
+                    catch
+                    {
+                    }
+                    MessageBox.Show(this,
+                        "The last update could not be applied automatically. The new FastCraft is saved in "
+                        + Locations.UpdateDir + " — replace FastCraft.exe with it by hand, or move FastCraft.exe somewhere you can write to.",
+                        "FastCraft update", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch
+            {
+            }
+
+            if (!_settings.CheckForUpdates) return;
+
+            try
+            {
+                var info = await _updates.CheckAsync(CancellationToken.None);
+                if (info == null) return;
+                if (_updateWindow != null) return;
+
+                var window = new UpdateWindow(info) { Owner = this };
+                _updateWindow = window;
+                window.Closed += delegate { _updateWindow = null; };
+                window.Show();
+            }
+            catch
+            {
+                // No update check on a flaky network; it runs again on the next start.
             }
         }
 
@@ -433,6 +480,7 @@ namespace FastCraft
             _settings.DownloadJava = DownloadJavaCheck.IsChecked == true;
             _settings.TurboJvmFlags = TurboCheck.IsChecked == true;
             _settings.KeepLauncherOpen = KeepOpenCheck.IsChecked == true;
+            _settings.CheckForUpdates = CheckUpdatesCheck.IsChecked == true;
             _settings.Save(Locations.SettingsPath);
         }
     }

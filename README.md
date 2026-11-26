@@ -88,6 +88,21 @@ If signing in says *"Microsoft sign-in could not be started (HTTP 400)"*, Micros
 own Azure app — Microsoft Accounts tenant, public client, device code flow — and put its id in
 `AuthService.ClientId` in `Auth/AuthService.cs`.
 
+## Updates
+
+Every push to `main` builds FastCraft and publishes it as a GitHub release (`v1.0.<build number>`, with
+`FastCraft.exe` attached). An installed FastCraft checks that release on start; when it is newer, a window
+pops up with the versions, the release notes and an **Update now** button. The new exe is downloaded to
+`%APPDATA%\FastCraft\update\FastCraft.exe`, FastCraft restarts, and a small helper script replaces the old
+exe with it.
+
+- This works from the first build that contains the updater onwards; an older exe without it has to be
+  replaced by hand once.
+- If the exe cannot be replaced (for example because it sits in `Program Files`), the next start shows a
+  message with the folder where the downloaded update is.
+- *Check for updates on startup* can be turned off in the settings.
+- Local builds report version `1.0.0`, so they will offer every published release.
+
 ## Where things are stored
 
 Everything lives under `%APPDATA%\FastCraft`:
@@ -109,7 +124,7 @@ Your existing `.minecraft` folder is only read from, to avoid re-downloading fil
 
 - No Forge, Fabric, NeoForge or Quilt mod loaders — vanilla versions only.
 - No Minecraft Bedrock/Windows Edition.
-- No self-updater, no multiple accounts, no per-instance mod management.
+- No multiple accounts, no per-instance mod management.
 - The launcher itself is not code-signed, so Windows SmartScreen may warn on first run.
 - Versions older than 1.6 use the retired legacy sign-in and will not start with a Microsoft
   account. 1.6 and newer work; the newest releases need Java 21, which FastCraft downloads for you.
