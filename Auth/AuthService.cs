@@ -96,6 +96,7 @@ namespace FastCraft.Auth
         private const string McLauncherLoginUrl = "https://api.minecraftservices.com/launcher/login";
         private const string McLoginWithXboxUrl = "https://api.minecraftservices.com/authentication/login_with_xbox";
         private const string McProfileUrl = "https://api.minecraftservices.com/minecraft/profile";
+        private const string McEntitlementsUrl = "https://api.minecraftservices.com/entitlements/mcstore";
 
         public async Task<DeviceCode> StartDeviceCodeAsync(CancellationToken cancellationToken)
         {
@@ -266,6 +267,7 @@ namespace FastCraft.Auth
             // login_with_xbox endpoint is heavily rate limited and only runs as a fallback.
             var xToken = "XBL3.0 x=" + uhs + ";" + xstsToken;
             string mcToken = null;
+            string lastToken = null;
             long expiresIn = 0;
             string profileBody = null;
             var failures = new List<string>();
@@ -276,6 +278,7 @@ namespace FastCraft.Auth
             if (launcherResult.IsRateLimited) throw Throttled(launcherResult, "Launcher login");
 
             var launcherToken = ReadMinecraftToken(launcherResult, out expiresIn);
+            if (!string.IsNullOrEmpty(launcherToken)) lastToken = launcherToken;
             if (string.IsNullOrEmpty(launcherToken))
             {
                 failures.Add("Launcher login HTTP " + launcherResult.Code + ": " + DescribeError(launcherResult.Body) + launcherResult.Diagnostics);
@@ -336,6 +339,7 @@ namespace FastCraft.Auth
 
                 long xboxExpires;
                 var xboxToken = ReadMinecraftToken(loginResult, out xboxExpires);
+                if (!string.IsNullOrEmpty(xboxToken)) lastToken = xboxToken;
                 if (string.IsNullOrEmpty(xboxToken))
                 {
                     failures.Add("login_with_xbox HTTP " + loginResult.Code + ": " + DescribeError(loginResult.Body) + loginResult.Diagnostics);
@@ -367,7 +371,11 @@ namespace FastCraft.Auth
 
             if (string.IsNullOrEmpty(profileBody) || string.IsNullOrEmpty(mcToken))
             {
-                // Both routes refused: hold off instead of letting repeated clicks make it worse.
+                // One extra request, only after a refusal: if the entitlements endpoint accepts
+                // the same token, the token is good and it is the profile call that Mojang
+                // refuses — that separates a throttled connection from a rejected token, or an
+                // app id that is not approved for the Minecraft API.
+                failures.Add(await DescribeEntitlementAsync(lastToken, cancellationToken).ConfigureAwait(false));
                 AuthBackoff.Register(300);
                 throw new AuthException(DescribeFailure(failures));
             }
@@ -513,30 +521,71 @@ namespace FastCraft.Auth
             if (string.IsNullOrEmpty(body)) return "";
             if (body.Contains("AADSTS700016")) return " That app id is not known in the Microsoft Accounts tenant: register the app with the account type 'Personal Microsoft accounts only' and copy its Application (client) ID again.";
             if (body.Contains("AADSTS7000218")) return " The app registration must allow public client flows: Authentication → 'Allow public client flows' → Yes.";
-            if (body.Contains("AADSTS65001")) return " The app has no consent for the Xbox Live permission: API permissions → add permission → APIs my organization uses → Xbox Live → XboxLive.signin and XboxLive.offline_access (delegated), then sign in again.";
-            if (body.Contains("AADSTS70011") || body.Contains("invalid_scope")) return " The app is missing the Xbox Live scopes: API permissions → add Xbox Live → XboxLive.signin and XboxLive.offline_access (delegated).";
+            if (body.Contains("AADSTS65001")) return " Microsoft has not recorded consent for this app yet: sign in again and accept the screen it shows. Nothing has to be added under API permissions for Xbox Live — the XboxLive.signin scope travels with the sign-in request itself.";
+            if (body.Contains("AADSTS70011") || body.Contains("invalid_scope")) return " The XboxLive.signin scope was refused: the app has to accept personal Microsoft accounts, and the scope is sent with the request (there is no Xbox Live permission to add).";
             if (body.Contains("AADSTS50059")) return " The app id belongs to a single-tenant registration: it has to be registered for personal Microsoft accounts.";
             return "";
         }
 
         private string DescribeFailure(List<string> failures)
         {
-            var message = new StringBuilder();
-            message.Append("Could not sign in to Minecraft. ").Append(string.Join(" / ", failures)).Append(".");
-            message.Append(HintsFor(string.Join(" ", failures)));
-            message.Append(" Microsoft accepted the sign-in and Mojang handed out a Minecraft token, but refused it when the profile was asked for. That is neither a wrong password nor a missing licence.");
-            message.Append(" Either this connection has made too many attempts — then only waiting a few hours helps, and a VPN or a shared network makes it worse — or the request budget of the shared app id was used up by other people.");
+            var relevant = failures.FindAll(line => !string.IsNullOrEmpty(line));
+            var text = new StringBuilder();
+            text.Append("Could not sign in to Minecraft. ").Append(string.Join(" / ", relevant)).Append(".");
+            text.Append(HintsFor(string.Join(" ", relevant)));
+            text.Append(" Microsoft accepted the sign-in and Mojang issued a Minecraft token, but the profile was refused, so it is neither a wrong password nor a missing licence.");
+            text.Append(" Read the entitlements line above: at 200 the token is accepted and only the profile call is refused — that is what an app id Mojang has not approved for the Minecraft API gets, and what a connection with too many attempts gets.");
             if (UsesCustomClientId)
             {
-                message.Append(" You already use your own app id, so the second cause does not apply.");
+                text.Append(" You use your own app id: submit it for approval at https://aka.ms/mce-reviewappid — until Mojang approves it, api.minecraftservices.com keeps refusing it. Delete ")
+                    .Append(ClientIdFilePath).Append(" to go back to the built-in id meanwhile.");
             }
             else
             {
-                message.Append(" To rule the second cause out, put your own Azure app id in ").Append(ClientIdFilePath)
-                    .Append(" (the README shows how) and sign in again.");
+                text.Append(" You use the built-in app id, which is approved, so the connection is the likely cause: wait a few hours before trying again, and turn a VPN off if you use one.");
             }
-            message.Append(" Mojang's exact answer and its headers are in auth.log next to that file.");
-            return message.ToString();
+            text.Append(" Mojang's exact answers and their headers are in auth.log.");
+            return text.ToString();
+        }
+
+        /// <summary>
+        /// Asks the entitlements endpoint with the token that was just issued: it says whether
+        /// Minecraft accepts the token at all, which is the difference between a refused token
+        /// and a refused profile call. One request, and only after a sign-in has failed.
+        /// </summary>
+        private static async Task<string> DescribeEntitlementAsync(string token, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(token)) return "";
+            HttpResult result;
+            try
+            {
+                result = await Http.GetAsync(McEntitlementsUrl, "Bearer " + token, cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                return "";
+            }
+            AuthLog.Write("Entitlements: HTTP " + result.Code + " " + DescribeError(result.Body) + result.Diagnostics);
+            if (!result.IsOk)
+            {
+                return "entitlements HTTP " + result.Code + ": " + DescribeError(result.Body) + result.Diagnostics;
+            }
+            var items = 0;
+            try
+            {
+                using (var document = JsonDocument.Parse(result.Body))
+                {
+                    JsonElement array;
+                    if (document.RootElement.TryGetProperty("items", out array) && array.ValueKind == JsonValueKind.Array)
+                    {
+                        items = array.GetArrayLength();
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+            }
+            return "entitlements HTTP 200 with " + items + " item(s)";
         }
 
         private static void ThrowIfThrottled()

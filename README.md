@@ -112,19 +112,21 @@ things are left: too many attempts from your connection (only waiting a few hour
 network makes that worse), or the request budget of the shared app id being used up by other people. The second
 one you can rule out yourself:
 
-1. In the Azure portal, create an app registration with the **Microsoft Accounts** tenant, account type
+1. In the Azure portal, create an app registration in the **Microsoft Accounts** tenant, account type
    *personal Microsoft accounts only*, no redirect URI.
 2. Under *Authentication*, turn on **Allow public client flows** (the device code flow needs it).
-3. Under *API permissions → Add a permission → APIs my organization uses*, add **Xbox Live** with the delegated
-   permissions `XboxLive.signin` and `XboxLive.offline_access` — without them Microsoft refuses the sign-in with
-   `AADSTS65001`, and FastCraft says so in its message.
-4. Put the app (client) id into `%APPDATA%\FastCraft\client-id.txt` — the bare GUID, or the whole line pasted
-   from the portal, since the first GUID in the file is used. Start FastCraft again: that id then replaces the
-   shared one for the device code and the refresh, and the first line of `auth.log` (`Client id: …`) names the
-   one in use.
+3. *API permissions* needs **nothing**. `XboxLive.signin` is a Microsoft Account scope that travels in the sign-in
+   request itself, not an Azure permission you can grant — that is why "Xbox Live" is not listed under
+   *APIs my organization uses*, and it does not have to be.
+4. **Mojang has to approve the app for the Minecraft API**: submit it at https://aka.ms/mce-reviewappid. Until it
+   is approved, `api.minecraftservices.com` refuses the profile call, so the built-in id stays the one that works.
+5. Put the app (client) id into `%APPDATA%\FastCraft\client-id.txt` — the bare GUID, or the whole line pasted
+   from the portal, since the first GUID in the file is used — and start FastCraft again. The first line of
+   `auth.log` (`Client id: …`) names the one in use; delete the file to go back to the built-in id.
 
 Every sign-in step is also written to `%APPDATA%\FastCraft\auth.log` with its HTTP status and the server's
-error text (`Device code`, `Xbox Live`, `XSTS`, `Launcher login`, `Profile`, `login_with_xbox`), never a token.
+error text (`Device code`, `Xbox Live`, `XSTS`, `Launcher login`, `Profile`, `login_with_xbox`, `Entitlements`),
+never a token.
 For refusals the response body and the headers that explain a rejection (`WWW-Authenticate`, `x-ms-error-code`,
 `x-ms-request-id`, …) are included, and the same detail appears in the launcher's message.
 That file is what to include in a bug report; the window title shows the version you are running.
@@ -181,8 +183,9 @@ from Mojang's public CDN after you sign in with an account that owns the game, a
 account does not own Minecraft: Java Edition. Do not use it to play without a licence.
 
 Ownership is confirmed with the account's Minecraft: Java Edition profile: `/minecraft/profile` answers 404 for an
-account without the game, and that account is refused. The older `/entitlements/mcstore` check is not used — it now
-answers HTTP 401 even for accounts that own the game.
+account without the game, and that account is refused. `/entitlements/mcstore` is not needed for that, but FastCraft
+asks it once after a failed sign-in, because its answer separates a token Minecraft refuses from a profile call it
+refuses.
 
 The sign-in uses Prism Launcher's public Azure app id `c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb` — a public client
 in the Microsoft Accounts tenant with the device code flow enabled. The old Xbox Live id `00000000402b5328`
