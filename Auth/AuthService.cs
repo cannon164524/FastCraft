@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using FastCraft.Core;
@@ -67,8 +68,12 @@ namespace FastCraft.Auth
             {
                 if (File.Exists(ClientIdFilePath))
                 {
+                    // The whole file is searched, so a line pasted from the portal such as
+                    // "Application (client) ID: …" works as well as the bare GUID.
+                    var text = File.ReadAllText(ClientIdFilePath);
+                    var match = GuidPattern.Match(text);
                     Guid id;
-                    if (Guid.TryParse(File.ReadAllText(ClientIdFilePath).Trim(), out id)) return id.ToString();
+                    if (match.Success && Guid.TryParse(match.Value, out id)) return id.ToString();
                     AuthLog.Write("client-id.txt holds no GUID, so the built-in app id is used.");
                 }
             }
@@ -77,6 +82,10 @@ namespace FastCraft.Auth
             }
             return ClientId;
         }
+
+        private static readonly Regex GuidPattern = new Regex(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+            RegexOptions.Compiled);
 
         private const string NoProfileMessage = "This Microsoft account has no Minecraft: Java Edition profile, so it does not own the game. Buy Minecraft: Java Edition at minecraft.net, or start the official launcher once if you play through Xbox Game Pass.";
 
@@ -101,7 +110,7 @@ namespace FastCraft.Auth
             if (!result.IsOk)
             {
                 throw new AuthException("Microsoft sign-in could not be started (HTTP " + result.Code + "). "
-                    + DescribeError(result.Body));
+                    + DescribeError(result.Body) + HintsFor(result.Body));
             }
 
             var code = new DeviceCode();
@@ -494,10 +503,27 @@ namespace FastCraft.Auth
             }
         }
 
+        /// <summary>
+        /// Plain-language fixes for the Azure errors an app registration most often causes: a
+        /// registration that is not open to personal accounts, one without public client flows,
+        /// or one that was never given the Xbox Live permission.
+        /// </summary>
+        private static string HintsFor(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return "";
+            if (body.Contains("AADSTS700016")) return " That app id is not known in the Microsoft Accounts tenant: register the app with the account type 'Personal Microsoft accounts only' and copy its Application (client) ID again.";
+            if (body.Contains("AADSTS7000218")) return " The app registration must allow public client flows: Authentication → 'Allow public client flows' → Yes.";
+            if (body.Contains("AADSTS65001")) return " The app has no consent for the Xbox Live permission: API permissions → add permission → APIs my organization uses → Xbox Live → XboxLive.signin and XboxLive.offline_access (delegated), then sign in again.";
+            if (body.Contains("AADSTS70011") || body.Contains("invalid_scope")) return " The app is missing the Xbox Live scopes: API permissions → add Xbox Live → XboxLive.signin and XboxLive.offline_access (delegated).";
+            if (body.Contains("AADSTS50059")) return " The app id belongs to a single-tenant registration: it has to be registered for personal Microsoft accounts.";
+            return "";
+        }
+
         private string DescribeFailure(List<string> failures)
         {
             var message = new StringBuilder();
             message.Append("Could not sign in to Minecraft. ").Append(string.Join(" / ", failures)).Append(".");
+            message.Append(HintsFor(string.Join(" ", failures)));
             message.Append(" Microsoft accepted the sign-in and Mojang handed out a Minecraft token, but refused it when the profile was asked for. That is neither a wrong password nor a missing licence.");
             message.Append(" Either this connection has made too many attempts — then only waiting a few hours helps, and a VPN or a shared network makes it worse — or the request budget of the shared app id was used up by other people.");
             if (UsesCustomClientId)

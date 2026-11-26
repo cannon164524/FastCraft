@@ -115,9 +115,13 @@ one you can rule out yourself:
 1. In the Azure portal, create an app registration with the **Microsoft Accounts** tenant, account type
    *personal Microsoft accounts only*, no redirect URI.
 2. Under *Authentication*, turn on **Allow public client flows** (the device code flow needs it).
-3. Put the app (client) id — one GUID, nothing else — into `%APPDATA%\FastCraft\client-id.txt` and start
-   FastCraft again. That id is then used for the device code and the refresh instead of the shared one, and
-   `auth.log` names which one was used.
+3. Under *API permissions → Add a permission → APIs my organization uses*, add **Xbox Live** with the delegated
+   permissions `XboxLive.signin` and `XboxLive.offline_access` — without them Microsoft refuses the sign-in with
+   `AADSTS65001`, and FastCraft says so in its message.
+4. Put the app (client) id into `%APPDATA%\FastCraft\client-id.txt` — the bare GUID, or the whole line pasted
+   from the portal, since the first GUID in the file is used. Start FastCraft again: that id then replaces the
+   shared one for the device code and the refresh, and the first line of `auth.log` (`Client id: …`) names the
+   one in use.
 
 Every sign-in step is also written to `%APPDATA%\FastCraft\auth.log` with its HTTP status and the server's
 error text (`Device code`, `Xbox Live`, `XSTS`, `Launcher login`, `Profile`, `login_with_xbox`), never a token.
