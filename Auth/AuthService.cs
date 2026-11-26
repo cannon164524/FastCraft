@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -42,9 +44,41 @@ namespace FastCraft.Auth
         // retired and now returns AADSTS700016 from the consumers endpoint.
         public const string ClientId = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
 
-        private const string NoProfileMessage = "This Microsoft account has no Minecraft: Java Edition profile, so it does not own the game. Buy Minecraft: Java Edition at minecraft.net, or start the official launcher once if you play through Xbox Game Pass.";
+        private readonly string _clientId;
 
-        private const string RefusedHint = " Mojang refused the Minecraft token, which is usually temporary throttling after several sign-in attempts: wait about half an hour, then start FastCraft and sign in once.";
+        public AuthService()
+        {
+            _clientId = LoadClientId();
+        }
+
+        /// <summary>True when the user supplied an own Azure app id instead of the shared one.</summary>
+        public bool UsesCustomClientId { get { return _clientId != ClientId; } }
+
+        private static string ClientIdFilePath { get { return Path.Combine(Locations.Root, "client-id.txt"); } }
+
+        /// <summary>
+        /// An optional own Azure app id, one GUID on one line in
+        /// %APPDATA%\FastCraft\client-id.txt. The shared id has a shared request budget at
+        /// Mojang, which can be used up by other people; an own id does not have that problem.
+        /// </summary>
+        private static string LoadClientId()
+        {
+            try
+            {
+                if (File.Exists(ClientIdFilePath))
+                {
+                    Guid id;
+                    if (Guid.TryParse(File.ReadAllText(ClientIdFilePath).Trim(), out id)) return id.ToString();
+                    AuthLog.Write("client-id.txt holds no GUID, so the built-in app id is used.");
+                }
+            }
+            catch
+            {
+            }
+            return ClientId;
+        }
+
+        private const string NoProfileMessage = "This Microsoft account has no Minecraft: Java Edition profile, so it does not own the game. Buy Minecraft: Java Edition at minecraft.net, or start the official launcher once if you play through Xbox Game Pass.";
 
         private const string DeviceCodeUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
         private const string TokenUrl = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
@@ -57,8 +91,9 @@ namespace FastCraft.Auth
         public async Task<DeviceCode> StartDeviceCodeAsync(CancellationToken cancellationToken)
         {
             ThrowIfThrottled();
+            AuthLog.Write("Client id: " + _clientId);
 
-            var form = "client_id=" + Uri.EscapeDataString(ClientId)
+            var form = "client_id=" + Uri.EscapeDataString(_clientId)
                      + "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access");
             var result = await Http.PostFormAsync(DeviceCodeUrl, form, cancellationToken).ConfigureAwait(false);
             AuthLog.Write("Device code: HTTP " + result.Code);
@@ -97,7 +132,7 @@ namespace FastCraft.Auth
                 await Task.Delay(interval * 1000, cancellationToken).ConfigureAwait(false);
 
                 var form = "grant_type=" + Uri.EscapeDataString("urn:ietf:params:oauth:grant-type:device_code")
-                         + "&client_id=" + Uri.EscapeDataString(ClientId)
+                         + "&client_id=" + Uri.EscapeDataString(_clientId)
                          + "&device_code=" + Uri.EscapeDataString(code.DeviceCodeValue);
                 var result = await Http.PostFormAsync(TokenUrl, form, cancellationToken).ConfigureAwait(false);
 
@@ -234,12 +269,12 @@ namespace FastCraft.Auth
             var launcherToken = ReadMinecraftToken(launcherResult, out expiresIn);
             if (string.IsNullOrEmpty(launcherToken))
             {
-                failures.Add("Launcher login HTTP " + launcherResult.Code + ": " + DescribeError(launcherResult.Body));
+                failures.Add("Launcher login HTTP " + launcherResult.Code + ": " + DescribeError(launcherResult.Body) + launcherResult.Diagnostics);
             }
             else
             {
                 var profile = await Http.GetAsync(McProfileUrl, "Bearer " + launcherToken, cancellationToken).ConfigureAwait(false);
-                AuthLog.Write("Profile (launcher login token): HTTP " + profile.Code + " " + DescribeError(profile.Body));
+                AuthLog.Write("Profile (launcher login token): HTTP " + profile.Code + " " + DescribeError(profile.Body) + profile.Diagnostics);
                 if (profile.IsOk)
                 {
                     mcToken = launcherToken;
@@ -260,7 +295,7 @@ namespace FastCraft.Auth
                     // fallback route is used.
                     await Task.Delay(2000, cancellationToken).ConfigureAwait(false);
                     var retry = await Http.GetAsync(McProfileUrl, "Bearer " + launcherToken, cancellationToken).ConfigureAwait(false);
-                    AuthLog.Write("Profile retry (launcher login token): HTTP " + retry.Code + " " + DescribeError(retry.Body));
+                    AuthLog.Write("Profile retry (launcher login token): HTTP " + retry.Code + " " + DescribeError(retry.Body) + retry.Diagnostics);
                     if (retry.IsOk)
                     {
                         mcToken = launcherToken;
@@ -276,7 +311,7 @@ namespace FastCraft.Auth
                     }
                     else
                     {
-                        failures.Add("Profile HTTP " + retry.Code + ": " + DescribeError(retry.Body));
+                        failures.Add("Profile HTTP " + retry.Code + ": " + DescribeError(retry.Body) + retry.Diagnostics);
                     }
                 }
             }
@@ -294,12 +329,12 @@ namespace FastCraft.Auth
                 var xboxToken = ReadMinecraftToken(loginResult, out xboxExpires);
                 if (string.IsNullOrEmpty(xboxToken))
                 {
-                    failures.Add("login_with_xbox HTTP " + loginResult.Code + ": " + DescribeError(loginResult.Body));
+                    failures.Add("login_with_xbox HTTP " + loginResult.Code + ": " + DescribeError(loginResult.Body) + loginResult.Diagnostics);
                 }
                 else
                 {
                     var profile = await Http.GetAsync(McProfileUrl, "Bearer " + xboxToken, cancellationToken).ConfigureAwait(false);
-                    AuthLog.Write("Profile (login_with_xbox token): HTTP " + profile.Code + " " + DescribeError(profile.Body));
+                    AuthLog.Write("Profile (login_with_xbox token): HTTP " + profile.Code + " " + DescribeError(profile.Body) + profile.Diagnostics);
                     if (profile.IsOk)
                     {
                         mcToken = xboxToken;
@@ -316,7 +351,7 @@ namespace FastCraft.Auth
                     }
                     else
                     {
-                        failures.Add("Profile HTTP " + profile.Code + ": " + DescribeError(profile.Body));
+                        failures.Add("Profile HTTP " + profile.Code + ": " + DescribeError(profile.Body) + profile.Diagnostics);
                     }
                 }
             }
@@ -325,7 +360,7 @@ namespace FastCraft.Auth
             {
                 // Both routes refused: hold off instead of letting repeated clicks make it worse.
                 AuthBackoff.Register(300);
-                throw new AuthException("Could not sign in to Minecraft. " + string.Join(" / ", failures) + RefusedHint);
+                throw new AuthException(DescribeFailure(failures));
             }
 
             // 4. Ownership: a profile exists only for an account with Minecraft: Java
@@ -368,7 +403,7 @@ namespace FastCraft.Auth
                 // Offline or a dead connection: report nothing usable and let the caller decide.
                 return null;
             }
-            AuthLog.Write("Saved session: HTTP " + profile.Code + " " + DescribeError(profile.Body));
+            AuthLog.Write("Saved session: HTTP " + profile.Code + " " + DescribeError(profile.Body) + profile.Diagnostics);
             if (profile.IsOk)
             {
                 ApplyProfile(account, profile.Body);
@@ -402,7 +437,7 @@ namespace FastCraft.Auth
             ThrowIfThrottled();
 
             var form = "grant_type=refresh_token"
-                     + "&client_id=" + Uri.EscapeDataString(ClientId)
+                     + "&client_id=" + Uri.EscapeDataString(_clientId)
                      + "&refresh_token=" + Uri.EscapeDataString(account.RefreshToken)
                      + "&scope=" + Uri.EscapeDataString("XboxLive.SignIn XboxLive.offline_access");
             var result = await Http.PostFormAsync(TokenUrl, form, cancellationToken).ConfigureAwait(false);
@@ -457,6 +492,25 @@ namespace FastCraft.Auth
             catch (JsonException)
             {
             }
+        }
+
+        private string DescribeFailure(List<string> failures)
+        {
+            var message = new StringBuilder();
+            message.Append("Could not sign in to Minecraft. ").Append(string.Join(" / ", failures)).Append(".");
+            message.Append(" Microsoft accepted the sign-in and Mojang handed out a Minecraft token, but refused it when the profile was asked for. That is neither a wrong password nor a missing licence.");
+            message.Append(" Either this connection has made too many attempts — then only waiting a few hours helps, and a VPN or a shared network makes it worse — or the request budget of the shared app id was used up by other people.");
+            if (UsesCustomClientId)
+            {
+                message.Append(" You already use your own app id, so the second cause does not apply.");
+            }
+            else
+            {
+                message.Append(" To rule the second cause out, put your own Azure app id in ").Append(ClientIdFilePath)
+                    .Append(" (the README shows how) and sign in again.");
+            }
+            message.Append(" Mojang's exact answer and its headers are in auth.log next to that file.");
+            return message.ToString();
         }
 
         private static void ThrowIfThrottled()
@@ -550,7 +604,10 @@ namespace FastCraft.Auth
                     if (!string.IsNullOrEmpty(error)) parts = error;
                     if (!string.IsNullOrEmpty(description)) parts = string.IsNullOrEmpty(parts) ? description : parts + ": " + description;
                     if (parts.Length > 400) parts = parts.Substring(0, 400);
-                    return parts;
+                    if (parts.Length > 0) return parts;
+                    // A refusal whose JSON has no error field: show what Mojang actually sent,
+                    // so the next report contains the real answer instead of a blank.
+                    return Trimmed(body);
                 }
             }
             catch (JsonException)

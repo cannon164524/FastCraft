@@ -107,8 +107,22 @@ So if it says *"Mojang is throttling sign-in"*, wait the minutes it names — ab
 attempts — then press Sign in with Microsoft **once**. A plain `HTTP 401` from `/minecraft/profile` with an empty
 body is what Mojang returns while it throttles; it does not mean the account is wrong.
 
+If Microsoft accepted the sign-in, Mojang handed out a Minecraft token, and the profile is still refused, two
+things are left: too many attempts from your connection (only waiting a few hours helps, and a VPN or a shared
+network makes that worse), or the request budget of the shared app id being used up by other people. The second
+one you can rule out yourself:
+
+1. In the Azure portal, create an app registration with the **Microsoft Accounts** tenant, account type
+   *personal Microsoft accounts only*, no redirect URI.
+2. Under *Authentication*, turn on **Allow public client flows** (the device code flow needs it).
+3. Put the app (client) id — one GUID, nothing else — into `%APPDATA%\FastCraft\client-id.txt` and start
+   FastCraft again. That id is then used for the device code and the refresh instead of the shared one, and
+   `auth.log` names which one was used.
+
 Every sign-in step is also written to `%APPDATA%\FastCraft\auth.log` with its HTTP status and the server's
 error text (`Device code`, `Xbox Live`, `XSTS`, `Launcher login`, `Profile`, `login_with_xbox`), never a token.
+For refusals the response body and the headers that explain a rejection (`WWW-Authenticate`, `x-ms-error-code`,
+`x-ms-request-id`, …) are included, and the same detail appears in the launcher's message.
 That file is what to include in a bug report; the window title shows the version you are running.
 
 ## Updates

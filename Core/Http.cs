@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -14,16 +15,18 @@ namespace FastCraft.Core
     /// </summary>
     public readonly struct HttpResult
     {
-        public HttpResult(HttpStatusCode status, string body, double retryAfterSeconds)
+        public HttpResult(HttpStatusCode status, string body, double retryAfterSeconds, string diagnostics)
         {
             Status = status;
             Body = body ?? "";
             RetryAfterSeconds = retryAfterSeconds;
+            Diagnostics = diagnostics ?? "";
         }
 
         public readonly HttpStatusCode Status;
         public readonly string Body;
         public readonly double RetryAfterSeconds;
+        public readonly string Diagnostics;
 
         public int Code { get { return (int)Status; } }
         public bool IsOk { get { return Status == HttpStatusCode.OK; } }
@@ -74,7 +77,7 @@ namespace FastCraft.Core
                 using (var response = await Client.SendAsync(request, cancellationToken).ConfigureAwait(false))
                 {
                     var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    return new HttpResult(response.StatusCode, body, ReadRetryAfter(response));
+                    return new HttpResult(response.StatusCode, body, ReadRetryAfter(response), ReadDiagnostics(response));
                 }
             }
         }
@@ -91,7 +94,7 @@ namespace FastCraft.Core
                 using (var response = await Client.SendAsync(request, cancellationToken).ConfigureAwait(false))
                 {
                     var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    return new HttpResult(response.StatusCode, body, ReadRetryAfter(response));
+                    return new HttpResult(response.StatusCode, body, ReadRetryAfter(response), ReadDiagnostics(response));
                 }
             }
         }
@@ -102,7 +105,7 @@ namespace FastCraft.Core
             using (var response = await Client.PostAsync(url, content, cancellationToken).ConfigureAwait(false))
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                return new HttpResult(response.StatusCode, body, ReadRetryAfter(response));
+                return new HttpResult(response.StatusCode, body, ReadRetryAfter(response), ReadDiagnostics(response));
             }
         }
 
@@ -115,6 +118,35 @@ namespace FastCraft.Core
                 if (header.Date.HasValue) return Math.Max(0.0, (header.Date.Value - DateTimeOffset.UtcNow).TotalSeconds);
             }
             return 0;
+        }
+
+        /// <summary>
+        /// Response headers that explain why a request was refused (WWW-Authenticate,
+        /// x-ms-error-code, …). Only filled for failures. No tokens appear here: those are sent
+        /// in the request's Authorization header, not in a response.
+        /// </summary>
+        private static string ReadDiagnostics(HttpResponseMessage response)
+        {
+            if (response.IsSuccessStatusCode) return "";
+            var builder = new StringBuilder();
+            AppendHeader(builder, response, "WWW-Authenticate");
+            AppendHeader(builder, response, "x-ms-error-code");
+            AppendHeader(builder, response, "x-ms-request-id");
+            AppendHeader(builder, response, "x-ms-correlation-request-id");
+            AppendHeader(builder, response, "server");
+            if (builder.Length > 300) builder.Length = 300;
+            return builder.ToString();
+        }
+
+        private static void AppendHeader(StringBuilder builder, HttpResponseMessage response, string name)
+        {
+            IEnumerable<string> found;
+            List<string> values = null;
+            if (response.Headers.TryGetValues(name, out found)) values = new List<string>(found);
+            else if (response.Content.Headers.TryGetValues(name, out found)) values = new List<string>(found);
+            if (values == null || values.Count == 0) return;
+            if (builder.Length > 0) builder.Append("; ");
+            builder.Append(name).Append("=").Append(string.Join(", ", values));
         }
     }
 }
