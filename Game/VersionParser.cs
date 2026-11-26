@@ -135,6 +135,10 @@ namespace FastCraft.Game
                 {
                     info.ArtifactPath = path;
                     info.ArtifactUrl = url;
+                    // Fabric publishes sha1 and size at the top level of a library entry instead
+                    // of in a "downloads" block. Verifying them costs nothing, so use them.
+                    info.ArtifactSha1 = JsonHelp.GetString(library, "sha1");
+                    info.ArtifactSize = JsonHelp.GetLong(library, "size");
                 }
             }
 

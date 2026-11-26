@@ -1,11 +1,60 @@
 # FastCraft
 
-A small, fast launcher for **Minecraft: Java Edition** on Windows, written in C# / WPF on .NET 8.
+A small, fast launcher for **Minecraft: Java Edition** on Windows, written in C# / WPF on .NET 8 — and a faster way
+to play the newest release. On **26.3**, FastCraft starts the **FastCraft edition**: the same Minecraft, booted
+through Fabric with a curated set of performance mods, a speed preset and tuned JVM flags, instead of plain vanilla.
+Older versions have no FastCraft edition, so choosing one warns you and launches vanilla Minecraft.
 
-FastCraft only launches official Mojang versions (releases, and snapshots if you tick the box). Online play needs a
-Microsoft account that actually **owns** Minecraft: Java Edition — the ownership check is part of the sign-in, and
-FastCraft never fakes a session. For single player there is an **offline profile** (a local nickname), which is what
-you use while Microsoft's sign-in is unavailable; it cannot join online servers or Realms.
+Online play needs a Microsoft account that actually **owns** Minecraft: Java Edition — the ownership check is part
+of the sign-in, and FastCraft never fakes a session. For single player there is an **offline profile** (a local
+nickname), which is what you use while Microsoft's sign-in is unavailable; it cannot join online servers or Realms.
+
+## The FastCraft edition
+
+The edition is **Mojang's client plus a performance layer**: FastCraft installs the Fabric loader and a curated set
+of client-side performance mods into the game folder, writes a performance preset into a fresh game folder, and
+starts the game through Fabric with tuned JVM flags. The game files are still official Mojang files, downloaded from
+Mojang's CDN after the ownership check — a launcher cannot ship a different Minecraft, and it does not try to.
+
+**Supported version: 26.3 only.** `FastEdition.GameVersion` in `Fast/FastEdition.cs` is the single place that
+decides it; bumping that constant is what supporting a new release means. Selecting any other version shows a
+warning on the Play view and launches vanilla Minecraft, without any of the performance layer.
+
+What it installs, newest release build per project for that game version from Modrinth:
+
+| Mod | What it speeds up |
+| --- | --- |
+| Sodium | the chunk renderer |
+| Lithium | game logic and ticking |
+| FerriteCore | memory use |
+| Krypton | the network stack |
+| ImmediatelyFast | batched immediate rendering |
+| EntityCulling | entities you cannot see |
+| MoreCulling | hidden block faces |
+| ModernFix | load time and memory |
+| Fabric API | the interfaces the others are built on |
+
+A mod with no build for the supported version is **skipped and logged**, never guessed at. Required dependencies of
+whatever resolves are fetched with it. The launcher keeps a list of the jars it installed
+(`mods\.fastcraft-managed.txt`): a mod that gets a new build has its old jar removed, and **files you added to
+`mods` yourself are never touched**.
+
+What to install is looked up once and then cached for twelve hours
+(`%APPDATA%\FastCraft\cache\fast-edition-<version>.txt`), so a launch behind a warm cache makes **no catalogue
+requests at all** — it only checks the jars already on disk. A lookup that found no mod is not cached, so a
+Modrinth outage is retried on the next launch instead of being remembered for half a day.
+
+These are client-side renderer and memory optimisations, not a cheat client — but individual servers set their own
+rules about modified clients, so check theirs before joining one.
+
+The preset is written only into a game folder that has no `options.txt` yet — 12 chunks of render distance, 10 of
+simulation distance, fewer particles, no entity shadows, vsync off, 260 FPS cap. Change anything you like in the
+game's video settings; FastCraft will not overwrite it.
+
+**When it cannot be installed** — Fabric has no build for the version yet, Modrinth is unreachable, a download fails
+— the game still starts, as plain vanilla, and the window log says what happened in a line beginning `[fast]`. Knowing
+that is better than a launch that dies or a silence that hides it.
+
 
 ## The interface
 
@@ -52,10 +101,11 @@ uses the file when it exists — a build without PowerShell still works, it just
 - **Optional tuned G1 flags** for Java 17+ (Aikar-style flags), and the game process is started with **High**
   priority, which reduces stutter while other Windows apps are running.
 
-Honest limits: once Minecraft itself starts, the JVM, the LWJGL natives, and roughly 100–200 MB of game and
-asset loading dominate startup. FastCraft makes the launcher side (checking, downloading and preparing files)
-much faster than the vanilla launcher, and it avoids redundant work on every launch — it cannot make Minecraft's
-own bootstrap instant, and it does not raise your in-game FPS.
+Honest limits: the launcher side (checking, downloading, preparing files) is faster than the vanilla launcher, and
+once the game starts the FastCraft edition's mods are what raise the frame rate — how much depends on your hardware,
+render distance and world. A launcher cannot rewrite Minecraft's renderer, so what the edition does is add the mods
+that do, keep them current, and start the game the way they expect. Minecraft's own startup (JVM, LWJGL natives,
+roughly 100–200 MB of game and asset loading) is still there; FastCraft only avoids redundant work around it.
 
 ## Get FastCraft.exe
 
@@ -116,9 +166,11 @@ The result is in `bin\Release\net8.0-windows\win-x64\publish\FastCraft.exe`.
 1. Press **Sign in with Microsoft**. A browser opens; enter the code shown in the window and sign in with the
    account that owns Minecraft. FastCraft checks ownership and loads your Minecraft name and UUID. Later starts
    reuse the saved session instead of asking again.
-2. Pick a version (tick **Show snapshots** for snapshots).
-3. Press **Launch Minecraft**. On the first launch it downloads the version, libraries, natives and assets; after
-   that, launching only checks what changed.
+2. Pick a version. The list defaults to the newest release, which is the version the FastCraft edition is built on;
+   picking anything older shows the warning that it will be vanilla Minecraft.
+3. Press **Launch FastCraft** (or **Launch Minecraft** for an older version). On the first launch it downloads the
+   version, libraries, natives and assets, then Fabric and the performance mods; after that, launching only checks
+   what changed.
 4. **Without signing in**: tick **Offline mode**, type a player name, and press Launch — see below.
 
 If the game exits with an error, FastCraft names the newest **crash report** and the **game log**
@@ -228,7 +280,8 @@ Your existing `.minecraft` folder is only read from, to avoid re-downloading fil
 
 ## What it does not do (yet)
 
-- No Forge, Fabric, NeoForge or Quilt mod loaders — vanilla versions only.
+- No Forge, NeoForge or Quilt, and no mod management of your own: Fabric comes with the FastCraft edition on 26.3,
+  and mods you drop into a version's `mods` folder are left alone but not managed.
 - No Minecraft Bedrock/Windows Edition.
 - No multiple accounts, no per-instance mod management.
 - The launcher itself is not code-signed, so Windows SmartScreen may warn on first run.
@@ -240,6 +293,10 @@ Your existing `.minecraft` folder is only read from, to avoid re-downloading fil
 FastCraft is not affiliated with Mojang or Microsoft. It contains no game code: it downloads the official files
 from Mojang's public CDN after you sign in with an account that owns the game, and it refuses to continue when the
 account does not own Minecraft: Java Edition. Do not use it to play without a licence.
+
+The FastCraft edition also downloads the Fabric loader from Fabric's maven and the performance mods from Modrinth.
+Those are other people's work under their own licences, installed into your own game folder; FastCraft neither
+re-hosts nor modifies them.
 
 Ownership is confirmed with the account's Minecraft: Java Edition profile: `/minecraft/profile` answers 404 for an
 account without the game, and that account is refused. `/entitlements/mcstore` is not needed for that, but FastCraft

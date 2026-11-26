@@ -286,6 +286,16 @@
                                 </Border.Effect>
                             </Border>
                             <TextBlock Text="READY TO PLAY" Style="{StaticResource Text.Label}"/>
+
+                            <Border x:Name="EditionBadge" Background="#26D9A55B" BorderBrush="#66FFC077"
+                                    BorderThickness="1" CornerRadius="5" Padding="8,2" Margin="12,0,0,0"
+                                    VerticalAlignment="Center">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FFC077" BlurRadius="14" ShadowDepth="0" Opacity="0.45"/>
+                                </Border.Effect>
+                                <TextBlock Text="FASTCRAFT EDITION" FontSize="9.5" FontWeight="Bold"
+                                           Foreground="{StaticResource Brush.Accent}"/>
+                            </Border>
                         </StackPanel>
 
                         <TextBlock x:Name="VersionHero" Text="—" FontSize="46" FontWeight="Bold"
@@ -298,6 +308,19 @@
 
                         <TextBlock x:Name="VersionMeta" Text="No version selected"
                                    Style="{StaticResource Text.Body}" Margin="0,4,0,0"/>
+
+                        <!-- shown instead of the badge when the selected version is not the one
+                             the edition is built on: that launch is vanilla, and it is slower. -->
+                        <Border x:Name="VanillaWarning" Visibility="Collapsed" Margin="0,16,0,0" CornerRadius="11"
+                                Background="#1FE8B36A" BorderBrush="#66E8B36A" BorderThickness="1"
+                                Padding="15,12" HorizontalAlignment="Left" MaxWidth="600">
+                            <StackPanel>
+                                <TextBlock Text="VANILLA MINECRAFT, NOT THE FASTCRAFT EDITION" FontSize="10.5"
+                                           FontWeight="Bold" Foreground="{StaticResource Brush.Warn}"/>
+                                <TextBlock x:Name="VanillaWarningText" Style="{StaticResource Text.Body}"
+                                           Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
 
                         <Border Height="1" Width="160" HorizontalAlignment="Left" Margin="0,20,0,0">
                             <Border.Background>
@@ -346,7 +369,12 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Text="VERSIONS" Style="{StaticResource Text.Label}"/>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <TextBlock Text="VERSIONS" Style="{StaticResource Text.Label}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="VersionsCaption" Style="{StaticResource Text.Label}"
+                                   Foreground="{StaticResource Brush.TextFaint}" Margin="12,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,12,0,16">
                         <Button x:Name="RefreshVersionsButton" Style="{StaticResource Button.Ghost}"

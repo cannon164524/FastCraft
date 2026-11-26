@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FastCraft.Auth;
 using FastCraft.Core;
+using FastCraft.Fast;
 using FastCraft.Game;
 using FastCraft.Update;
 
@@ -43,6 +44,7 @@ namespace FastCraft
             InitializeComponent();
             Title = "FastCraft " + UpdateService.CurrentVersion;
             TitleVersion.Text = UpdateService.CurrentVersion.ToString();
+            VersionsCaption.Text = "the FastCraft edition is " + FastEdition.GameVersion + " · older versions launch vanilla";
             Icon = BuildWindowIcon();
 
             Locations.Ensure();
@@ -440,11 +442,30 @@ namespace FastCraft
             {
                 VersionHero.Text = "—";
                 VersionMeta.Text = "No version selected";
+                EditionBadge.Visibility = Visibility.Collapsed;
+                VanillaWarning.Visibility = Visibility.Collapsed;
+                LaunchButton.Content = "Launch Minecraft";
+            }
+            else if (FastEdition.Supports(summary.Id))
+            {
+                VersionHero.Text = summary.Id;
+                VersionMeta.Text = "FastCraft edition: Fabric loader, " + FastEdition.Mods.Length
+                                   + " performance mods and a speed preset on Mojang's build";
+                EditionBadge.Visibility = Visibility.Visible;
+                VanillaWarning.Visibility = Visibility.Collapsed;
+                LaunchButton.Content = "Launch FastCraft";
             }
             else
             {
+                var kind = summary.Type == "snapshot" ? "Snapshot" : "Release";
                 VersionHero.Text = summary.Id;
-                VersionMeta.Text = summary.Type == "snapshot" ? "Snapshot build" : "Release build";
+                VersionMeta.Text = kind + " build: plain Mojang Minecraft";
+                EditionBadge.Visibility = Visibility.Collapsed;
+                VanillaWarning.Visibility = Visibility.Visible;
+                VanillaWarningText.Text = summary.Id + " is older than " + FastEdition.GameVersion
+                    + ", so no FastCraft edition of it exists. This launches vanilla Minecraft, without the "
+                    + "performance mods, the speed preset or the tuning, and it will run at ordinary Minecraft speed.";
+                LaunchButton.Content = "Launch Minecraft";
             }
             AnimateHero();
         }
@@ -756,12 +777,25 @@ namespace FastCraft
                 return;
             }
 
+            // Only the supported version has a FastCraft edition. Everything else is Mojang's
+            // own build and will run at vanilla speed, which the log states before it starts.
+            var fastEdition = FastEdition.Supports(summary.Id);
+            if (fastEdition)
+            {
+                Log("Launching the FastCraft edition of " + summary.Id + ".");
+            }
+            else
+            {
+                Log("Launching vanilla " + summary.Id + ". The FastCraft edition is built for "
+                    + FastEdition.GameVersion + " only, so this build has no performance layer.");
+            }
+
             _settings.LastVersion = summary.Id;
             _settings.Save(Locations.SettingsPath);
 
             _downloader.ResetCounters();
             _cts = new CancellationTokenSource();
-            SetBusy(true, "Preparing " + summary.Id + "…");
+            SetBusy(true, (fastEdition ? "Preparing the FastCraft edition of " : "Preparing ") + summary.Id + "…");
             _timer.Start();
 
             try
@@ -779,7 +813,7 @@ namespace FastCraft
                 var version = VersionParser.Parse(File.ReadAllText(versionPath));
 
                 Log("Launching " + version.Id + "…");
-                var process = await _launcher.LaunchAsync(version, launchAccount, _settings, Log, _cts.Token);
+                var process = await _launcher.LaunchAsync(version, launchAccount, _settings, fastEdition, Log, _cts.Token);
                 Log("Minecraft is running (process " + process.Id + ").");
                 StatusText.Text = "Minecraft is running.";
             }
