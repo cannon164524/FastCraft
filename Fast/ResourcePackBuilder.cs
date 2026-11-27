@@ -184,8 +184,10 @@ namespace FastCraft.Fast
 
             foreach (var target in targets)
             {
-                int width;
-                int height;
+                // Initialised because TryGetSize only runs when the texture is in the asset index;
+                // with the short-circuit the compiler cannot prove the two are assigned.
+                int width = 0;
+                int height = 0;
                 var present = target.InIndex
                               && assets.TryGetSize(target.Namespace + "/" + target.Path, out width, out height);
                 if (!present)

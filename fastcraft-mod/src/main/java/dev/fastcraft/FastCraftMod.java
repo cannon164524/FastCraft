@@ -5,7 +5,7 @@ import java.util.function.UnaryOperator;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.biome.v1.BiomeModifications;
 import net.fabricmc.fabric.api.biome.v1.BiomeSelectors;
-import net.fabricmc.fabric.api.itemgroup.v1.CreativeModeTabEvents;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -83,7 +83,7 @@ public class FastCraftMod implements ModInitializer
         });
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.NATURAL_BLOCKS).register(output ->
             output.accept(AMBER_ORE_ITEM));
-        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS).register(output ->
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(output ->
         {
             output.accept(AMBER_SWORD);
             output.accept(AMBER_PICKAXE);
