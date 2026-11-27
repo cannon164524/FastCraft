@@ -1,5 +1,8 @@
 plugins {
-    id 'fabric-loom' version "${loom_version}"
+    // Minecraft 26.1 and newer are unobfuscated, which Loom serves through its own plugin id
+    // ("net.fabricmc.fabric-loom", not the backwards-compatible "fabric-loom" that expects an
+    // obfuscated game and a mappings artifact).
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'java'
 }
 
@@ -12,7 +15,8 @@ base {
 
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
-    mappings loom.officialMojangMappings()
+    // No "mappings" line: 26.3 ships its real class names and parameter names, and Mojang
+    // publishes no client_mappings for it, so there is nothing to remap or download.
     modImplementation "net.fabricmc:fabric-loader:${loader_version}"
     // Only for the biome modification API, which the launcher installs anyway.
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
