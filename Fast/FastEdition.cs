@@ -56,6 +56,7 @@ namespace FastCraft.Fast
             new Mod("moreculling", "MoreCulling", "skips hidden block faces"),
             new Mod("modernfix", "ModernFix", "load time and memory"),
             new Mod("fabric-api", "Fabric API", "the interfaces the others are built on"),
+            new Mod("modmenu", "Mod Menu", "the Mods screen on the title screen"),
             new Mod("fancymenu", "FancyMenu", "the layout and text of the menus")
         };
     }
