@@ -17,7 +17,7 @@ namespace FastCraft.Fast
     public static class Branding
     {
         /// <summary>Bump this to rewrite the pack and the menu set-up on the next launch.</summary>
-        public const int Version = 5;
+        public const int Version = 6;
 
         private const string MarkerName = ".fastcraft-brand.txt";
 
