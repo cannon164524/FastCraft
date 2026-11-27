@@ -80,7 +80,8 @@ namespace FastCraft.Game
             {
                 try
                 {
-                    var edition = await _fast.EnsureAsync(version.Id, gameDirectory, log, cancellationToken).ConfigureAwait(false);
+                    var edition = await _fast.EnsureAsync(version.Id, gameDirectory, install.ClientJar,
+                        install.AssetIndexFile, log, cancellationToken).ConfigureAwait(false);
                     if (edition.Active)
                     {
                         fastLibraries.AddRange(edition.LibraryPaths);

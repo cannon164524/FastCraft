@@ -16,6 +16,7 @@ namespace FastCraft.Game
         public string ClientJar;
         public string AssetsRoot;
         public string LogConfig;
+        public string AssetIndexFile;
         public readonly List<string> Classpath = new List<string>();
     }
 
@@ -128,6 +129,9 @@ namespace FastCraft.Game
                     Size = version.AssetIndex.Size
                 });
             }
+
+            // The branding reads this index to learn which textures this version actually has.
+            result.AssetIndexFile = indexFile;
 
             if (!string.IsNullOrEmpty(version.LoggingFileUrl) && !string.IsNullOrEmpty(version.LoggingArgument))
             {

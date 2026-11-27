@@ -44,8 +44,9 @@ whatever resolves are fetched with it. The launcher keeps a list of the jars it 
 `mods` yourself are never touched**.
 
 What to install is looked up once and then cached for twelve hours
-(`%APPDATA%\FastCraft\cache\fast-edition-<version>.txt`), so a launch behind a warm cache makes **no catalogue
-requests at all** — it only checks the jars already on disk. A lookup that found no mod is not cached, so a
+(`%APPDATA%\FastCraft\cache\fast-edition-<version>-v2.txt`), so a launch behind a warm cache makes **no catalogue
+requests at all** — it only checks the jars already on disk. The `v2` is bumped whenever the mod set changes, so a
+new set is looked up instead of a stale one being reused. A lookup that found no mod is not cached, so a
 Modrinth outage is retried on the next launch instead of being remembered for half a day.
 
 These are client-side renderer and memory optimisations, not a cheat client — but individual servers set their own
@@ -65,19 +66,58 @@ not there, those lines say where it went — usually `Modrinth … has no 26.3 b
 publisher telling us there is nothing to install yet, not a launcher bug.
 
 
+## The look inside the game
+
+26.3 is not only started faster, it looks like FastCraft. Two things do that, both generated on
+the first launch of the edition and both reversible:
+
+**A resource pack FastCraft draws itself** (`instances\26.3\resourcepacks\FastCraft.zip`). The
+images are drawn by the launcher in its own palette, so the game and the launcher cannot drift
+apart: the amber wordmark with the two speed chevrons, a "FASTCRAFT EDITION" line under it, dark
+button plates that turn amber under the pointer (the main menu **and** the pause menu use them),
+a near-black menu backdrop instead of the dirt, the title screen's panorama replaced by the
+launcher's dark aurora, FastCraft splashes, and `menu.game` overridden so the pause menu header
+reads **FastCraft · Game Menu**. The texture paths and the pack format are read from this
+version's own asset index and `version.json`, so a path the game does not have is skipped and
+named in the log instead of being guessed at.
+
+**A FancyMenu set-up** (`instances\26.3\config\fancymenu\`). A resource pack cannot add text, so
+FancyMenu does what a pack cannot: the custom pause menu title and a small `FASTCRAFT` mark in
+the pause menu's corner, plus `modpack_mode = true` so its own editing UI stays out of a menu
+that is supposed to look like a client. The screen class names are read from the client jar.
+
+- The pack is enabled once, by adding `"file/FastCraft.zip"` to the `resourcePacks` line of
+  `instances\26.3\options.txt`; every other pack and setting is kept. Turn it off in
+  Options → Resource Packs and a relaunch leaves it off.
+- `instances\26.3\.fastcraft-brand.txt` records what was applied. Delete it to have the next
+  launch write the pack and the menu set-up again; `Branding.Version` in `Fast/Branding.cs`
+  is what forces a rewrite when the art changes.
+- The FancyMenu layout applies to the **English** UI, since a pack can only override the
+  `en_us` translation; on another language the pause header keeps its normal text.
+- A resource pack may not change the Mojang logo — the game blocks that on purpose — and none
+  of this touches the HUD or the game's own screens beyond the menus above.
+
+FancyMenu is a 38 MB download with three dependencies; it arrives with the other mods on the
+first 26.3 launch of the edition.
+
+
+
 ## The interface
 
 One window, no tabs inside tabs: a 228 px rail with four views — **Play**, **Versions**, **Settings**, **Logs** —
 the account card pinned to its bottom, and a status strip along the bottom edge that says what the launcher is
 doing.
 
-- **One accent, no gradients.** Charcoal surfaces, hairline borders, one amber accent (`#D9A55B`) used only for the
-  primary action, the selection marker and the icon; everything else is text in three weights.
-- **The version you are about to launch is the headline** of the Play view — name at 32 px, build type underneath —
-  instead of a drop-down buried in a toolbar. Choosing one happens in the Versions list.
-- **Motion where it means something:** a page change fades in and rises 12 px over 240 ms; buttons sink 1.5 % when
-  pressed and put an 8 % glow under the cursor in 120 ms; the checkbox mark and the selection bars fade in; the
-  progress bar animates between its 200 ms samples instead of jumping.
+- **One accent, used as light.** Near-black translucent surfaces, hairline borders, one amber accent (`#D9A55B`,
+  glow `#FFC077`) on the primary action, the selection marker and the icon; blurred halos sit behind buttons, the
+  selected nav item, a focused field and the progress fill.
+- **Ambient light.** Three soft orbs drift behind the pages at different speeds, and the cards are translucent so
+  that light bleeds through them instead of sitting on top.
+- **The version you are about to launch is the headline** of the Play view — 46 px in an amber gradient — and it
+  swells and flares whenever the selection changes. Choosing a version happens in the Versions list.
+- **Motion with weight:** a page change rises 30 px, swells slightly and sharpens out of a blur while its children
+  follow in a staggered wave; buttons squash on press and release with an elastic overshoot; the launch button's
+  halo breathes; the status dot pulses while work is running.
 - **Its own window chrome** (`WindowChrome`, 46 px caption, drawn minimise/maximise/close), so the launcher does not
   wear Windows 10's title bar on Windows 11.
 

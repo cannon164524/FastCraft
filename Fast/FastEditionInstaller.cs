@@ -37,6 +37,13 @@ namespace FastCraft.Fast
     {
         private static readonly TimeSpan CacheLifetime = TimeSpan.FromHours(12);
 
+        /// <summary>
+        /// Part of the cache file name. Bump it when the mod list changes, so an edition that
+        /// was resolved before the change is looked up again instead of being reused for the
+        /// rest of the cache lifetime.
+        /// </summary>
+        private const int SetVersion = 2;
+
         private readonly Downloader _downloader;
         private readonly FabricInstaller _fabric = new FabricInstaller();
         private readonly ModCatalog _catalog = new ModCatalog();
@@ -56,8 +63,8 @@ namespace FastCraft.Fast
             public readonly List<ModFile> Mods = new List<ModFile>();
         }
 
-        public async Task<FastEditionResult> EnsureAsync(string gameVersion, string gameDirectory, Action<string> log,
-            CancellationToken cancellationToken)
+        public async Task<FastEditionResult> EnsureAsync(string gameVersion, string gameDirectory, string clientJar,
+            string assetIndexFile, Action<string> log, CancellationToken cancellationToken)
         {
             var result = new FastEditionResult();
 
@@ -67,7 +74,7 @@ namespace FastCraft.Fast
                 return result;
             }
 
-            var cachePath = Path.Combine(Locations.CacheDir, "fast-edition-" + gameVersion + ".txt");
+            var cachePath = Path.Combine(Locations.CacheDir, "fast-edition-" + gameVersion + "-v" + SetVersion + ".txt");
             var cache = ReadCache(cachePath);
 
             string loaderVersion;
@@ -157,6 +164,30 @@ namespace FastCraft.Fast
             // A performance preset, written only into a game folder that has none: options the
             // player changed are never overwritten.
             WriteOptionsPreset(gameDirectory, log);
+
+            // 3. The look inside the game: the resource pack FastCraft draws itself, and the
+            //    FancyMenu set-up that adds what a pack cannot. A failure here is a log line,
+            //    never a stopped launch.
+            try
+            {
+                var branding = Branding.Ensure(gameVersion, gameDirectory, clientJar, assetIndexFile, log);
+                if (!string.IsNullOrEmpty(branding.Problem))
+                {
+                    log("[fast] Branding skipped: " + branding.Problem + ".");
+                }
+                else
+                {
+                    log("[fast] Branding: " + branding.Summary + ".");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                log("[fast] Branding could not be applied: " + ex.Message);
+            }
 
             result.Active = true;
             result.MainClass = mainClass;
