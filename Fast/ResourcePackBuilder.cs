@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Windows;
 
 namespace FastCraft.Fast
@@ -76,9 +78,18 @@ namespace FastCraft.Fast
                     }
 
                     var format = GameAssets.GetResourcePackFormat(clientJar);
-                    Add(archive, "pack.mcmeta", Encoding.UTF8.GetBytes(PackMeta(format)));
+                    Add(archive, "pack.mcmeta", Encoding.UTF8.GetBytes(PackMeta(format, log)));
                     Add(archive, "assets/minecraft/texts/splashes.txt", Encoding.UTF8.GetBytes(Splashes()));
-                    Add(archive, "assets/minecraft/lang/en_us.json", Encoding.UTF8.GetBytes(Language()));
+
+                    // A lang file is resolved per pack, not merged: writing one that holds only
+                    // our key would replace every other string with its translation key. The key
+                    // is merged into the version's own en_us.json instead, and the file is left
+                    // out when that cannot be read, rather than an interface of raw keys.
+                    var language = Language(clientJar, log);
+                    if (!string.IsNullOrEmpty(language))
+                    {
+                        Add(archive, "assets/minecraft/lang/en_us.json", Encoding.UTF8.GetBytes(language));
+                    }
                 }
 
                 if (File.Exists(path)) File.Delete(path);
@@ -163,19 +174,30 @@ namespace FastCraft.Fast
             return files;
         }
 
-        private static string PackMeta(string format)
+        /// <summary>
+        /// pack.mcmeta in the shape Minecraft has wanted since 25w31a, where min_format and
+        /// max_format replaced pack_format (26.3 is resource format 97.1). Writing the old
+        /// "pack_format: 1" fallback was what made the game call this pack incompatible.
+        ///
+        /// The upper bound is left open so a later release still accepts the pack, and a format
+        /// that cannot be read at all starts at 1: a range is compared, not guessed at, and 97.1
+        /// sits inside it either way.
+        /// </summary>
+        private static string PackMeta(string format, Action<string> log)
         {
+            var min = "1";
             if (!string.IsNullOrEmpty(format))
             {
-                return "{\n  \"pack\": {\n    \"description\": \"" + Description + "\",\n"
-                       + "    \"min_format\": " + format + ",\n    \"max_format\": " + format + "\n  }\n}\n";
+                min = format;
+                log("[brand] Pack format " + format + " read from the client jar.");
+            }
+            else
+            {
+                log("[brand] The client jar did not give a pack format; the pack declares a range from 1 up.");
             }
 
-            // No version.json to read: a range wide enough to be accepted, so the pack still
-            // loads instead of being refused as incompatible.
             return "{\n  \"pack\": {\n    \"description\": \"" + Description + "\",\n"
-                   + "    \"pack_format\": 1,\n    \"supported_formats\": {\n"
-                   + "      \"min_inclusive\": 1,\n      \"max_inclusive\": 999\n    }\n  }\n}\n";
+                   + "    \"min_format\": " + min + ",\n    \"max_format\": 9999\n  }\n}\n";
         }
 
         private static string Splashes()
@@ -204,9 +226,35 @@ namespace FastCraft.Fast
             return builder.ToString();
         }
 
-        private static string Language()
+        /// <summary>
+        /// The version's own en_us.json with menu.game replaced, so the pause screen header says
+        /// FastCraft while every other string still comes from the game.
+        /// </summary>
+        private static string Language(string clientJar, Action<string> log)
         {
-            return "{\n  \"menu.game\": \"FastCraft \u00b7 Game Menu\"\n}\n";
+            string vanilla;
+            if (!GameAssets.TryReadJarText(clientJar, "assets/minecraft/lang/en_us.json", out vanilla))
+            {
+                log("[brand] The game's en_us.json was not readable, so only FancyMenu names the pause screen.");
+                return null;
+            }
+
+            try
+            {
+                var node = JsonNode.Parse(vanilla) as JsonObject;
+                if (node == null)
+                {
+                    log("[brand] The game's en_us.json is not a JSON object, so only FancyMenu names the pause screen.");
+                    return null;
+                }
+                node["menu.game"] = "FastCraft \u00b7 Game Menu";
+                return node.ToJsonString();
+            }
+            catch (JsonException)
+            {
+                log("[brand] The game's en_us.json could not be parsed, so only FancyMenu names the pause screen.");
+                return null;
+            }
         }
 
         private static void Add(ZipArchive archive, string name, byte[] content)

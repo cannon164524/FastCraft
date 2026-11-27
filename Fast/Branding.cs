@@ -17,7 +17,7 @@ namespace FastCraft.Fast
     public static class Branding
     {
         /// <summary>Bump this to rewrite the pack and the menu set-up on the next launch.</summary>
-        public const int Version = 1;
+        public const int Version = 2;
 
         private const string MarkerName = ".fastcraft-brand.txt";
 
@@ -52,33 +52,35 @@ namespace FastCraft.Fast
 
             if (state.Version >= Version && File.Exists(packPath) && File.Exists(menuOptions))
             {
-                result.Summary = "already in place (v" + state.Version + ")";
+                // The files are current, so only the switch is confirmed: the pack is on by
+                // default for the edition, and a launch must not leave it off.
+                var keptOn = EnablePack(gameDirectory, ResourcePackBuilder.PackFileName, log);
+                WriteState(markerPath, Version, keptOn);
+                result.Summary = "already in place (v" + state.Version + "), "
+                                 + (keptOn ? "pack on" : "pack could not be switched on");
                 return result;
             }
 
             var pack = new ResourcePackBuilder().Build(gameDirectory, clientJar, assetIndexFile, log);
             var menu = new FancyMenuSetup().Apply(gameDirectory, clientJar, log);
 
-            // Switch the pack on the first time only. If the player turns it off in Options,
-            // that is their choice and a relaunch leaves it alone.
-            var enabled = state.Enabled;
-            if (!enabled)
-            {
-                enabled = EnablePack(gameDirectory, ResourcePackBuilder.PackFileName, log);
-            }
+            // On by default: the pack is added to the game's list on every launch, so turning it
+            // off by hand in Options lasts until the next launch of the edition.
+            var enabled = EnablePack(gameDirectory, ResourcePackBuilder.PackFileName, log);
 
             WriteState(markerPath, Version, enabled);
 
             result.Applied = true;
             result.Summary = "pack " + (pack.PackWritten ? "written" : "not written")
                              + ", pause menu " + (menu ? "set up" : "not set up")
-                             + ", " + (enabled ? "pack enabled" : "pack left for the player to enable");
+                             + ", " + (enabled ? "pack on" : "pack could not be switched on");
             return result;
         }
 
         /// <summary>
-        /// Adds the pack to the resourcePacks list in options.txt, keeping every other pack and
-        /// every other setting. A line that cannot be read is left untouched rather than risked.
+        /// Puts the pack into the resourcePacks list in options.txt, keeping every other pack and
+        /// every other setting, and clears it from incompatibleResourcePacks so a pack the game
+        /// once refused does not stay refused. A line that cannot be read is left untouched.
         /// </summary>
         private static bool EnablePack(string gameDirectory, string packFileName, Action<string> log)
         {
@@ -95,63 +97,88 @@ namespace FastCraft.Fast
                 return false;
             }
 
-            var index = -1;
-            for (int i = 0; i < lines.Count; i++)
-            {
-                if (lines[i].TrimStart().StartsWith("resourcePacks:", StringComparison.OrdinalIgnoreCase))
-                {
-                    index = i;
-                    break;
-                }
-            }
+            var packs = ReadListLine(lines, "resourcePacks:", log);
+            if (packs == null) return false;
 
-            var packs = new List<string>();
-            if (index >= 0)
-            {
-                var raw = lines[index].TrimStart().Substring("resourcePacks:".Length);
-                try
-                {
-                    using (var document = JsonDocument.Parse(raw))
-                    {
-                        if (document.RootElement.ValueKind != JsonValueKind.Array) return false;
-                        foreach (var item in document.RootElement.EnumerateArray())
-                        {
-                            if (item.ValueKind == JsonValueKind.String) packs.Add(item.GetString());
-                        }
-                    }
-                }
-                catch
-                {
-                    log("[brand] The resourcePacks line in options.txt is not readable, so it was left alone.");
-                    return false;
-                }
-            }
-
-            if (packs.Count == 0) packs.Add("vanilla");
-
+            var already = false;
             foreach (var pack in packs)
             {
                 if (!string.Equals(pack, id, StringComparison.OrdinalIgnoreCase)) continue;
-                log("[brand] The FastCraft pack was already enabled.");
-                return true;
+                already = true;
+                break;
             }
 
-            packs.Add(id);
-            var json = JsonSerializer.Serialize(packs);
+            if (!already)
+            {
+                if (packs.Count == 0) packs.Add("vanilla");
+                packs.Add(id);
+                WriteListLine(lines, "resourcePacks:", packs);
+            }
 
-            if (index >= 0) lines[index] = "resourcePacks:" + json;
-            else lines.Add("resourcePacks:" + json);
+            var blocked = ReadListLine(lines, "incompatibleResourcePacks:", log);
+            if (blocked != null)
+            {
+                var removed = blocked.RemoveAll(pack => string.Equals(pack, id, StringComparison.OrdinalIgnoreCase));
+                if (removed > 0) WriteListLine(lines, "incompatibleResourcePacks:", blocked);
+            }
 
             try
             {
                 File.WriteAllLines(path, lines.ToArray());
-                log("[brand] The FastCraft pack is enabled in options.txt.");
-                return true;
             }
             catch
             {
                 return false;
             }
+
+            log(already
+                ? "[brand] The FastCraft pack is on in options.txt."
+                : "[brand] The FastCraft pack was switched on in options.txt.");
+            return true;
+        }
+
+        /// <summary>Reads a JSON array that sits on one line of options.txt, like resourcePacks.</summary>
+        private static List<string> ReadListLine(List<string> lines, string key, Action<string> log)
+        {
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                if (!line.TrimStart().StartsWith(key, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var raw = line.TrimStart().Substring(key.Length);
+                try
+                {
+                    using (var document = JsonDocument.Parse(raw))
+                    {
+                        if (document.RootElement.ValueKind != JsonValueKind.Array) return null;
+
+                        var list = new List<string>();
+                        foreach (var item in document.RootElement.EnumerateArray())
+                        {
+                            if (item.ValueKind == JsonValueKind.String) list.Add(item.GetString());
+                        }
+                        return list;
+                    }
+                }
+                catch
+                {
+                    log("[brand] The " + key.TrimEnd(':') + " line in options.txt is not readable, so it was left alone.");
+                    return null;
+                }
+            }
+
+            return new List<string>();
+        }
+
+        private static void WriteListLine(List<string> lines, string key, List<string> values)
+        {
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (!lines[i].TrimStart().StartsWith(key, StringComparison.OrdinalIgnoreCase)) continue;
+                lines[i] = key + JsonSerializer.Serialize(values);
+                return;
+            }
+            lines.Add(key + JsonSerializer.Serialize(values));
         }
 
         private static State ReadState(string path)

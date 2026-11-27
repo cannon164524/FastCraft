@@ -86,9 +86,17 @@ FancyMenu does what a pack cannot: the custom pause menu title and a small `FAST
 the pause menu's corner, plus `modpack_mode = true` so its own editing UI stays out of a menu
 that is supposed to look like a client. The screen class names are read from the client jar.
 
-- The pack is enabled once, by adding `"file/FastCraft.zip"` to the `resourcePacks` line of
-  `instances\26.3\options.txt`; every other pack and setting is kept. Turn it off in
-  Options → Resource Packs and a relaunch leaves it off.
+- **On by default for everyone.** Every launch of the edition puts `"file/FastCraft.zip"` into the
+  `resourcePacks` line of `instances\26.3\options.txt` if it is missing, keeping every other pack and
+  setting, and removes it from `incompatibleResourcePacks` so a pack the game once refused is not kept
+  refused. Switching it off by hand in Options therefore lasts until the next launch.
+- The pack declares `min_format` / `max_format`, the shape Minecraft wants since 25w31a, where they
+  replaced `pack_format`; 26.3 is resource format **97.1**, read from this version's own
+  `version.json`. The upper bound is open so a later release still accepts the pack. Writing the old
+  `pack_format: 1` fallback was what made the game call a working pack "incompatible".
+- The override of `menu.game` is **merged into the version's own `en_us.json`**, taken from the
+  client jar. A pack's lang file replaces the whole file, so shipping only that one key would have
+  turned every other label in the interface into raw translation keys.
 - `instances\26.3\.fastcraft-brand.txt` records what was applied. Delete it to have the next
   launch write the pack and the menu set-up again; `Branding.Version` in `Fast/Branding.cs`
   is what forces a rewrite when the art changes.

@@ -75,8 +75,40 @@ namespace FastCraft.Fast
         }
 
         /// <summary>
+        /// Text of a file inside the client jar, or false when this version does not ship it.
+        /// The branding needs it for the vanilla language file, which must be merged rather than
+        /// replaced: the game resolves a lang file per pack, so a pack that carries only its own
+        /// key would blank every other string in the interface.
+        /// </summary>
+        public static bool TryReadJarText(string clientJar, string entryName, out string text)
+        {
+            text = null;
+            try
+            {
+                if (string.IsNullOrEmpty(clientJar) || !File.Exists(clientJar)) return false;
+
+                using (var archive = ZipFile.OpenRead(clientJar))
+                {
+                    var entry = archive.GetEntry(entryName);
+                    if (entry == null) return false;
+
+                    using (var stream = entry.Open())
+                    using (var reader = new StreamReader(stream))
+                    {
+                        text = reader.ReadToEnd();
+                        return !string.IsNullOrEmpty(text);
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// The resource pack format of this exact version, from the "version.json" the client
-        /// jar carries. Returned as raw text so a format like 63.1 stays intact.
+        /// jar carries. Returned as raw text so a format like 97.1 stays intact.
         /// </summary>
         public static string GetResourcePackFormat(string clientJar)
         {
