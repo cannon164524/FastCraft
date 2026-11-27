@@ -18,6 +18,13 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # Loom needs Java 25 for 26.3 (the game itself needs Java SE 25 as well), and the
+      # runner's default JVM is 17, which Loom refuses. This one also becomes JAVA_HOME.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
       # The amber mod is built here and embedded into FastCraft.exe, so the launcher can
       # install it with the other mods without downloading anything of its own. A Gradle
       # failure is not allowed to stop the launcher build: the edition still works without
@@ -29,7 +36,7 @@ jobs:
           $api = (Invoke-RestMethod 'https://api.modrinth.com/v2/project/fabric-api/version?loaders=%5B%22fabric%22%5D&game_versions=%5B%2226.3%22%5D')[0].version_number
           [xml]$metadata = (Invoke-WebRequest 'https://maven.fabricmc.net/net/fabricmc/fabric-loom/maven-metadata.xml').Content
           $loom = $metadata.metadata.versioning.release
-          Write-Host "Fabric API $api, Loom $loom"
+          Write-Host "Fabric API $api, Loom $loom, Java $($env:JAVA_HOME)"
           Push-Location fastcraft-mod
           (Get-Content gradle.properties) `
             -replace '^fabric_api_version=.*', "fabric_api_version=$api" `
@@ -37,7 +44,7 @@ jobs:
           gradle build --no-daemon -Pmod_version=1.0.${{ github.run_number }}
           Pop-Location
           New-Item -ItemType Directory -Force Assets | Out-Null
-          $jar = Get-ChildItem fastcraft-mod/build/libs/*.jar |
+          $jar = Get-ChildItem fastcraft-mod/build/libs/*.jar -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -notmatch 'sources' } | Select-Object -First 1
           if ($jar) { Copy-Item $jar.FullName Assets/fastcraft-amber.jar; Write-Host "Embedding $($jar.Name)" }
           else { Write-Host "::warning::No amber mod jar was produced." }
@@ -61,13 +68,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "v1.0.${{ github.run_number }}"
-          # What's new is the commits since the previous release, so the update window
-          # can show the changes instead of a build stamp.
+          # What's new is the commits since the previous release, so the update window can
+          # show the changes instead of a build stamp. The comparison comes from GitHub's
+          # own API: a shallow checkout has no tag to run git log against.
           $previous = gh release view --json tagName -q .tagName 2>$null
           if ($previous) {
-              $commits = @(git log "$previous..HEAD" --no-merges --pretty=format:"- %s")
+              $commits = @(gh api "repos/${{ github.repository }}/compare/$previous...${{ github.sha }}" `
+                  --jq '.commits[] | "- " + (.commit.message | split("\n")[0])')
           } else {
-              $commits = @(git log -5 --no-merges --pretty=format:"- %s")
+              $commits = @("- First FastCraft build.")
           }
           if ($commits.Count -eq 0) { $commits = @("- No changes were recorded for this build.") }
           $notes = $commits -join "`n"

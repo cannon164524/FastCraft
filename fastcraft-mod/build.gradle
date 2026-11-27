@@ -20,8 +20,9 @@ dependencies {
 
 java {
     withSourcesJar()
+    // Loom for 26.3 needs a Java 25 runtime, and 26.3 itself requires Java SE 25.
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
