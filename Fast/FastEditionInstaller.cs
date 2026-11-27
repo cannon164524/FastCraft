@@ -90,7 +90,12 @@ namespace FastCraft.Fast
                 var profile = await _fabric.ResolveAsync(gameVersion, cancellationToken).ConfigureAwait(false);
                 if (profile == null)
                 {
-                    result.Problem = "Fabric has no build for " + gameVersion + " yet";
+                    result.Problem = "Fabric could not be reached";
+                    return result;
+                }
+                if (!string.IsNullOrEmpty(profile.Problem))
+                {
+                    result.Problem = profile.Problem;
                     return result;
                 }
 
