@@ -81,6 +81,12 @@ reads **FastCraft · Game Menu**. The texture paths and the pack format are read
 version's own asset index and `version.json`, so a path the game does not have is skipped and
 named in the log instead of being guessed at.
 
+- The title's two textures — the wordmark and the "edition" line — are drawn at **the exact pixel size
+  the game ships** (274×44 and 110×16). The title screen blits them at that size instead of scaling
+  them, so a texture with twice the pixels was read from its top-left corner and looked cut off; the
+  mark also keeps a tenth of its height as a safe margin on every side. The button and backdrop sprites
+  are nine-sliced, so those stay at twice the pixels.
+
 **A FancyMenu set-up** (`instances\26.3\config\fancymenu\`). A resource pack cannot add text, so
 FancyMenu does what a pack cannot: the custom pause menu title and a small `FASTCRAFT` mark in
 the pause menu's corner, plus `modpack_mode = true` so its own editing UI stays out of a menu

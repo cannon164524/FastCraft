@@ -16,6 +16,7 @@ namespace FastCraft.Fast
         public bool MenuWritten;
         public bool PackEnabled;
         public string PackPath = "";
+        public string TitleSize = "";
         public readonly List<string> Branded = new List<string>();
         public readonly List<string> Absent = new List<string>();
         public string Note = "";
@@ -36,13 +37,21 @@ namespace FastCraft.Fast
             public readonly string Path;
             public readonly int DefaultWidth;
             public readonly int DefaultHeight;
+            public readonly int Scale;
             public readonly Func<int, int, byte[]> Draw;
 
             public TextureTarget(string path, int defaultWidth, int defaultHeight, Func<int, int, byte[]> draw)
+                : this(path, defaultWidth, defaultHeight, 2, draw)
+            {
+            }
+
+            public TextureTarget(string path, int defaultWidth, int defaultHeight, int scale,
+                Func<int, int, byte[]> draw)
             {
                 Path = path;
                 DefaultWidth = defaultWidth;
                 DefaultHeight = defaultHeight;
+                Scale = Math.Max(1, scale);
                 Draw = draw;
             }
         }
@@ -99,7 +108,9 @@ namespace FastCraft.Fast
 
                 log("[brand] Pack written: " + result.Branded.Count + " texture(s) branded, "
                     + result.Absent.Count + " path(s) this version does not ship"
-                    + (result.Absent.Count > 0 ? " (" + string.Join(", ", result.Absent.ToArray()) + ")" : "") + ".");
+                    + (result.Absent.Count > 0 ? " (" + string.Join(", ", result.Absent.ToArray()) + ")" : "")
+                    + (string.IsNullOrEmpty(result.TitleSize) ? "" : "; title logo at " + result.TitleSize + ", the game's own size")
+                    + ".");
             }
             catch (Exception ex)
             {
@@ -122,9 +133,13 @@ namespace FastCraft.Fast
 
             var targets = new List<TextureTarget>
             {
-                new TextureTarget("textures/gui/title/minecraft.png", 274, 44,
+                // The title's own two textures are drawn at exactly the size this game ships
+                // (274×44 and 110×16). The title screen blits them at that size rather than
+                // scaling, so a texture at twice the pixels was sampled from its top-left corner
+                // and appeared cut off. The sprites below are nine-sliced and safe at twice.
+                new TextureTarget("textures/gui/title/minecraft.png", 274, 44, 1,
                     (width, height) => BrandArt.Wordmark(width, height)),
-                new TextureTarget("textures/gui/title/edition.png", 110, 16,
+                new TextureTarget("textures/gui/title/edition.png", 110, 16, 1,
                     (width, height) => BrandArt.EditionLabel(width, height)),
                 new TextureTarget("textures/gui/sprites/widget/button.png", 200, 20,
                     (width, height) => BrandArt.Button(width, height, BrandArt.ButtonKind.Normal)),
@@ -154,8 +169,13 @@ namespace FastCraft.Fast
                     result.Branded.Add(System.IO.Path.GetFileName(target.Path));
                 }
 
-                width = Math.Min(2048, Math.Max(1, width * 2));
-                height = Math.Min(2048, Math.Max(1, height * 2));
+                width = Math.Min(2048, Math.Max(1, width * target.Scale));
+                height = Math.Min(2048, Math.Max(1, height * target.Scale));
+
+                if (string.Equals(target.Path, "textures/gui/title/minecraft.png", StringComparison.Ordinal))
+                {
+                    result.TitleSize = width + "×" + height;
+                }
 
                 files["assets/minecraft/" + target.Path] = target.Draw(width, height);
             }

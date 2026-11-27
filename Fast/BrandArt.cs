@@ -41,16 +41,20 @@ namespace FastCraft.Fast
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
-                var chevrons = height * 0.58;
+                // A tenth of the height on each side is the safe area: the title screen draws
+                // this texture inside a frame a little smaller than itself, so glyphs must not
+                // reach the edge or they lose their last pixels.
+                var margin = height * 0.10;
+                var chevrons = height * 0.54;
                 var chevronsWidth = chevrons * 0.62;
-                var gap = height * 0.22;
+                var gap = height * 0.18;
 
-                DrawChevrons(dc, new Rect(height * 0.05, (height - chevrons) / 2, chevronsWidth, chevrons),
+                DrawChevrons(dc, new Rect(margin, (height - chevrons) / 2, chevronsWidth, chevrons),
                     Accent, chevrons * 0.17);
 
-                var left = height * 0.05 + chevronsWidth + gap;
-                var targetWidth = width - left - height * 0.05;
-                var targetHeight = height * 0.66;
+                var left = margin + chevronsWidth + gap;
+                var targetWidth = width - left - margin;
+                var targetHeight = height * 0.60;
                 if (targetWidth <= 0) return Encode(new RenderTargetBitmap(1, 1, 96, 96, PixelFormats.Pbgra32));
 
                 DrawFittedText(dc, "FASTCRAFT", left, (height - targetHeight) / 2, targetWidth, targetHeight,
