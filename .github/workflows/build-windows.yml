@@ -41,7 +41,11 @@ jobs:
           (Get-Content gradle.properties) `
             -replace '^fabric_api_version=.*', "fabric_api_version=$api" `
             -replace '^loom_version=.*', "loom_version=$loom" | Set-Content gradle.properties
-          gradle build --no-daemon -Pmod_version=1.0.${{ github.run_number }}
+          # Quoted and from the environment: the version must reach Gradle as one argument.
+          # Unquoted, the runner handed Gradle "1.0." and then ".32" as a task name.
+          $modVersion = "1.0.$($env:GITHUB_RUN_NUMBER)"
+          Write-Host "gradle build -Pmod_version=$modVersion"
+          & gradle 'build' '--no-daemon' '--console=plain' "-Pmod_version=$modVersion"
           Pop-Location
           New-Item -ItemType Directory -Force Assets | Out-Null
           $jar = Get-ChildItem fastcraft-mod/build/libs/*.jar -ErrorAction SilentlyContinue |

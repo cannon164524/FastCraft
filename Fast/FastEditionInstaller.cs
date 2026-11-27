@@ -42,7 +42,7 @@ namespace FastCraft.Fast
         /// was resolved before the change is looked up again instead of being reused for the
         /// rest of the cache lifetime.
         /// </summary>
-        private const int SetVersion = 2;
+        private const int SetVersion = 3;
 
         private readonly Downloader _downloader;
         private readonly FabricInstaller _fabric = new FabricInstaller();
