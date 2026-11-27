@@ -116,6 +116,27 @@ that is supposed to look like a client. The screen class names are read from the
 FancyMenu is a 38 MB download with three dependencies; it arrives with the other mods on the
 first 26.3 launch of the edition.
 
+### The amber tier
+
+`fastcraft-amber.jar` is **FastCraft's own mod**, in `fastcraft-mod/`. The workflow builds it with Gradle
+and embeds it in `FastCraft.exe`, so the launcher writes it into `mods` itself — there is no download of
+its own, which is what lets it work while the repository is private. It adds a tier between copper and iron:
+
+| Thing | Stats |
+| --- | --- |
+| `fastcraft:amber_ore` | 12 veins per chunk, y −16 to 48, stone or deepslate |
+| `fastcraft:raw_amber` | drops from the ore, smelts or blasts into an ingot |
+| `fastcraft:amber_ingot` | the repair item and the crafting material |
+| `fastcraft:amber_sword` / `_pickaxe` / `_axe` / `_shovel` / `_hoe` | 220 uses, mining speed 5.5, 1.5 attack damage, level 12 |
+
+Copper is 190 uses, speed 5, damage 1; iron is 250, speed 6, damage 2. The five tools are crafted in the
+usual shapes and the ore is mined with a stone pickaxe or better.
+
+Honest state: this is the first Java code in the project, so the 26.3 API and the Gradle/Loom version are
+resolved by the workflow from Fabric's and Modrinth's live data instead of being hard-coded, and the mod build
+step is allowed to fail without stopping the launcher release — the log names the call that moved. The ore's and
+the tools' textures and names come from the resource pack in the build after the mod first compiles.
+
 
 
 ## The interface

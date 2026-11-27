@@ -18,6 +18,30 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # The amber mod is built here and embedded into FastCraft.exe, so the launcher can
+      # install it with the other mods without downloading anything of its own. A Gradle
+      # failure is not allowed to stop the launcher build: the edition still works without
+      # it, and the step's log is where the API mismatch is read.
+      - name: Build the amber mod
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $api = (Invoke-RestMethod 'https://api.modrinth.com/v2/project/fabric-api/version?loaders=%5B%22fabric%22%5D&game_versions=%5B%2226.3%22%5D')[0].version_number
+          [xml]$metadata = (Invoke-WebRequest 'https://maven.fabricmc.net/net/fabricmc/fabric-loom/maven-metadata.xml').Content
+          $loom = $metadata.metadata.versioning.release
+          Write-Host "Fabric API $api, Loom $loom"
+          Push-Location fastcraft-mod
+          (Get-Content gradle.properties) `
+            -replace '^fabric_api_version=.*', "fabric_api_version=$api" `
+            -replace '^loom_version=.*', "loom_version=$loom" | Set-Content gradle.properties
+          gradle build --no-daemon -Pmod_version=1.0.${{ github.run_number }}
+          Pop-Location
+          New-Item -ItemType Directory -Force Assets | Out-Null
+          $jar = Get-ChildItem fastcraft-mod/build/libs/*.jar |
+            Where-Object { $_.Name -notmatch 'sources' } | Select-Object -First 1
+          if ($jar) { Copy-Item $jar.FullName Assets/fastcraft-amber.jar; Write-Host "Embedding $($jar.Name)" }
+          else { Write-Host "::warning::No amber mod jar was produced." }
+
       - name: Draw the app icon
         shell: pwsh
         continue-on-error: true

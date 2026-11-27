@@ -29,4 +29,10 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The amber mod, built by the workflow and carried inside the launcher so it can be
+         installed without a download. Absent in a local build without Gradle. -->
+    <EmbeddedResource Include="Assets/fastcraft-amber.jar" Condition="Exists('Assets/fastcraft-amber.jar')" />
+  </ItemGroup>
+
 </Project>

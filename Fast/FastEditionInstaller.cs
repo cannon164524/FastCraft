@@ -159,6 +159,7 @@ namespace FastCraft.Fast
             log("[fast] Mods folder: " + modsDirectory + " (" + CountJars(modsDirectory) + " jar(s) before this launch).");
 
             var installed = await InstallModsAsync(modsDirectory, mods, log, cancellationToken).ConfigureAwait(false);
+            installed += await InstallEmbeddedModAsync(modsDirectory, log, cancellationToken).ConfigureAwait(false);
             log("[fast] Mods folder now has " + CountJars(modsDirectory) + " jar(s), " + installed + " from the FastCraft set.");
 
             // A performance preset, written only into a game folder that has none: options the
@@ -195,6 +196,60 @@ namespace FastCraft.Fast
             return result;
         }
 
+        private const string EmbeddedModName = "fastcraft-amber.jar";
+
+        /// <summary>
+        /// Writes FastCraft's own mod — the amber tier between copper and iron — out of the
+        /// launcher's resources into the mods folder. It has no download of its own: the jar is
+        /// built with the launcher and carried inside it, so the content works even while the
+        /// repository is private. A launcher built without Gradle simply has no resource here.
+        /// </summary>
+        private static async Task<int> InstallEmbeddedModAsync(string modsDirectory, Action<string> log,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var assembly = typeof(FastEditionInstaller).Assembly;
+
+                Stream stream = null;
+                foreach (var name in assembly.GetManifestResourceNames())
+                {
+                    if (!name.EndsWith(EmbeddedModName, StringComparison.OrdinalIgnoreCase)) continue;
+                    stream = assembly.GetManifestResourceStream(name);
+                    break;
+                }
+
+                if (stream == null)
+                {
+                    log("[fast] This build carries no amber mod; the edition works without it.");
+                    return 0;
+                }
+
+                var destination = Path.Combine(modsDirectory, EmbeddedModName);
+                var temp = destination + ".tmp";
+
+                using (stream)
+                using (var file = File.Create(temp))
+                {
+                    await stream.CopyToAsync(file, 81920, cancellationToken).ConfigureAwait(false);
+                }
+
+                if (File.Exists(destination)) File.Delete(destination);
+                File.Move(temp, destination);
+                log("[fast] Installed FastCraft's own mod: " + EmbeddedModName + ".");
+                return 1;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                log("[fast] The amber mod could not be installed: " + ex.Message);
+                return 0;
+            }
+        }
+
         private static int CountJars(string directory)
         {
             try
@@ -220,6 +275,7 @@ namespace FastCraft.Fast
 
             var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in files) keep.Add(file.FileName);
+            keep.Add(EmbeddedModName);
 
             foreach (var name in previous)
             {

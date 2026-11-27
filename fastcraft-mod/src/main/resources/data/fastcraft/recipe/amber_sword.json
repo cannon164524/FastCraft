@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "X": "fastcraft:amber_ingot",
+    "S": "minecraft:stick"
+  },
+  "pattern": [
+    "X",
+    "X",
+    "S"
+  ],
+  "result": {
+    "id": "fastcraft:amber_sword",
+    "count": 1
+  }
+}
