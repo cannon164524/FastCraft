@@ -29,7 +29,6 @@ namespace FastCraft.Fast
             Directory.CreateDirectory(customization);
 
             var classes = GameAssets.FindScreenClasses(clientJar, "TitleScreen", "PauseScreen");
-            var title = Pick(classes, "TitleScreen", FallbackTitle);
             var pause = Pick(classes, "PauseScreen", FallbackPause);
 
             WriteOptions(directory);
