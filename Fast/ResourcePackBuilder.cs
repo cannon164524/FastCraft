@@ -175,29 +175,45 @@ namespace FastCraft.Fast
         }
 
         /// <summary>
-        /// pack.mcmeta in the shape Minecraft has wanted since 25w31a, where min_format and
-        /// max_format replaced pack_format (26.3 is resource format 97.1). Writing the old
-        /// "pack_format: 1" fallback was what made the game call this pack incompatible.
-        ///
-        /// The upper bound is left open so a later release still accepts the pack, and a format
-        /// that cannot be read at all starts at 1: a range is compared, not guessed at, and 97.1
-        /// sits inside it either way.
+        /// pack.mcmeta in the shape Minecraft has wanted since 25w31a. min_format and
+        /// max_format take an integer or a two-integer array [major, minor] — never a decimal,
+        /// and never a value below 65 without the old pack_format. Both mistakes are what made
+        /// the game label this pack "broken or incompatible": "97.1" is not a valid value, and a
+        /// fallback of 1 is below the allowed floor.
         /// </summary>
         private static string PackMeta(string format, Action<string> log)
         {
-            var min = "1";
-            if (!string.IsNullOrEmpty(format))
+            string min = "65";
+            string max = "9999";
+
+            int major;
+            int minor;
+            if (TrySplitFormat(format, out major, out minor))
             {
-                min = format;
-                log("[brand] Pack format " + format + " read from the client jar.");
+                // 97.1 becomes [97, 0] .. [97, 1]: the whole major, up to the exact minor.
+                min = "[" + major + ", 0]";
+                max = "[" + major + ", " + minor + "]";
+                log("[brand] Pack format " + major + "." + minor + " read from the client jar.");
             }
             else
             {
-                log("[brand] The client jar did not give a pack format; the pack declares a range from 1 up.");
+                log("[brand] The client jar did not give a pack format; the pack declares 65 and up, which the game accepts.");
             }
 
             return "{\n  \"pack\": {\n    \"description\": \"" + Description + "\",\n"
-                   + "    \"min_format\": " + min + ",\n    \"max_format\": 9999\n  }\n}\n";
+                   + "    \"min_format\": " + min + ",\n    \"max_format\": " + max + "\n  }\n}\n";
+        }
+
+        private static bool TrySplitFormat(string format, out int major, out int minor)
+        {
+            major = 0;
+            minor = 0;
+            if (string.IsNullOrEmpty(format)) return false;
+
+            var parts = format.Split('.');
+            if (!int.TryParse(parts[0], out major) || major <= 0) return false;
+            if (parts.Length > 1) int.TryParse(parts[1], out minor);
+            return true;
         }
 
         private static string Splashes()

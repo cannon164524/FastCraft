@@ -107,43 +107,99 @@ namespace FastCraft.Fast
         }
 
         /// <summary>
-        /// The resource pack format of this exact version, from the "version.json" the client
-        /// jar carries. Returned as raw text so a format like 97.1 stays intact.
+        /// The resource pack format of this exact version as "major.minor", from the
+        /// "version.json" the client jar carries. Since 25w31a that object is
+        /// pack_version.resource = { major, minor } with string values; older jars carry a
+        /// single number. Both are read: returning null here used to fall back to a range the
+        /// game labels "broken or incompatible".
         /// </summary>
         public static string GetResourcePackFormat(string clientJar)
         {
             try
             {
-                if (string.IsNullOrEmpty(clientJar) || !File.Exists(clientJar)) return null;
-
-                using (var archive = ZipFile.OpenRead(clientJar))
+                using (var document = OpenVersionJson(clientJar))
                 {
-                    var entry = archive.GetEntry("version.json");
-                    if (entry == null) return null;
+                    if (document == null) return null;
 
-                    using (var stream = entry.Open())
-                    using (var reader = new StreamReader(stream))
+                    JsonElement packVersion;
+                    if (!document.RootElement.TryGetProperty("pack_version", out packVersion)) return null;
+                    if (packVersion.ValueKind != JsonValueKind.Object) return null;
+
+                    JsonElement resource;
+                    if (!packVersion.TryGetProperty("resource", out resource)) return null;
+
+                    if (resource.ValueKind == JsonValueKind.Number)
                     {
-                        using (var document = JsonDocument.Parse(reader.ReadToEnd()))
-                        {
-                            JsonElement packVersion;
-                            if (!document.RootElement.TryGetProperty("pack_version", out packVersion)) return null;
-                            if (packVersion.ValueKind != JsonValueKind.Object) return null;
-
-                            JsonElement resource;
-                            if (!packVersion.TryGetProperty("resource", out resource)) return null;
-                            if (resource.ValueKind != JsonValueKind.Number) return null;
-
-                            var raw = resource.GetRawText();
-                            return string.IsNullOrEmpty(raw) ? null : raw;
-                        }
+                        return resource.GetRawText() + ".0";
                     }
+                    if (resource.ValueKind != JsonValueKind.Object) return null;
+
+                    var major = ReadInt(resource, "major");
+                    var minor = ReadInt(resource, "minor");
+                    if (major <= 0) return null;
+                    return major + "." + minor;
                 }
             }
             catch
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// The data version of this exact version, which is the "version" line options.txt
+        /// needs. The game replaces a file whose version line is missing with its defaults,
+        /// taking the resource pack selection with it.
+        /// </summary>
+        public static int GetDataVersion(string clientJar)
+        {
+            try
+            {
+                using (var document = OpenVersionJson(clientJar))
+                {
+                    if (document == null) return 0;
+                    return ReadInt(document.RootElement, "world_version");
+                }
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static JsonDocument OpenVersionJson(string clientJar)
+        {
+            if (string.IsNullOrEmpty(clientJar) || !File.Exists(clientJar)) return null;
+
+            using (var archive = ZipFile.OpenRead(clientJar))
+            {
+                var entry = archive.GetEntry("version.json");
+                if (entry == null) return null;
+
+                using (var stream = entry.Open())
+                using (var reader = new StreamReader(stream))
+                {
+                    return JsonDocument.Parse(reader.ReadToEnd());
+                }
+            }
+        }
+
+        private static int ReadInt(JsonElement element, string name)
+        {
+            JsonElement value;
+            if (!element.TryGetProperty(name, out value)) return 0;
+
+            if (value.ValueKind == JsonValueKind.Number)
+            {
+                int number;
+                return value.TryGetInt32(out number) ? number : 0;
+            }
+            if (value.ValueKind == JsonValueKind.String)
+            {
+                int number;
+                return int.TryParse(value.GetString(), out number) ? number : 0;
+            }
+            return 0;
         }
 
         /// <summary>

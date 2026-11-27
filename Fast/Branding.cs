@@ -17,7 +17,7 @@ namespace FastCraft.Fast
     public static class Branding
     {
         /// <summary>Bump this to rewrite the pack and the menu set-up on the next launch.</summary>
-        public const int Version = 2;
+        public const int Version = 3;
 
         private const string MarkerName = ".fastcraft-brand.txt";
 
@@ -32,6 +32,7 @@ namespace FastCraft.Fast
         {
             public int Version;
             public bool Enabled;
+            public string Format = "";
         }
 
         public static Result Ensure(string gameVersion, string gameDirectory, string clientJar, string assetIndexFile,
@@ -50,12 +51,17 @@ namespace FastCraft.Fast
             var packPath = ResourcePackBuilder.PackPath(gameDirectory);
             var menuOptions = Path.Combine(gameDirectory, "config", "fancymenu", "options.txt");
 
-            if (state.Version >= Version && File.Exists(packPath) && File.Exists(menuOptions))
+            // The pack's declared format comes from this game's own client jar. When it changes
+            // (a new release), the pack has to be rebuilt or the game calls it incompatible.
+            var format = GameAssets.GetResourcePackFormat(clientJar) ?? "";
+
+            if (state.Version >= Version && string.Equals(state.Format, format, StringComparison.Ordinal)
+                && File.Exists(packPath) && File.Exists(menuOptions))
             {
                 // The files are current, so only the switch is confirmed: the pack is on by
                 // default for the edition, and a launch must not leave it off.
-                var keptOn = EnablePack(gameDirectory, ResourcePackBuilder.PackFileName, log);
-                WriteState(markerPath, Version, keptOn);
+                var keptOn = EnablePack(gameDirectory, ResourcePackBuilder.PackFileName, clientJar, log);
+                WriteState(markerPath, Version, keptOn, format);
                 result.Summary = "already in place (v" + state.Version + "), "
                                  + (keptOn ? "pack on" : "pack could not be switched on");
                 return result;
@@ -66,9 +72,9 @@ namespace FastCraft.Fast
 
             // On by default: the pack is added to the game's list on every launch, so turning it
             // off by hand in Options lasts until the next launch of the edition.
-            var enabled = EnablePack(gameDirectory, ResourcePackBuilder.PackFileName, log);
+            var enabled = EnablePack(gameDirectory, ResourcePackBuilder.PackFileName, clientJar, log);
 
-            WriteState(markerPath, Version, enabled);
+            WriteState(markerPath, Version, enabled, format);
 
             result.Applied = true;
             result.Summary = "pack " + (pack.PackWritten ? "written" : "not written")
@@ -82,7 +88,7 @@ namespace FastCraft.Fast
         /// every other setting, and clears it from incompatibleResourcePacks so a pack the game
         /// once refused does not stay refused. A line that cannot be read is left untouched.
         /// </summary>
-        private static bool EnablePack(string gameDirectory, string packFileName, Action<string> log)
+        private static bool EnablePack(string gameDirectory, string packFileName, string clientJar, Action<string> log)
         {
             var id = "file/" + packFileName;
             var path = Path.Combine(gameDirectory, "options.txt");
@@ -95,6 +101,17 @@ namespace FastCraft.Fast
             catch
             {
                 return false;
+            }
+
+            // The game replaces an options.txt whose "version" line is missing (or older than
+            // its data version) with its defaults — taking the resource pack selection with it,
+            // which is why the pack kept coming back switched off. The number comes from the
+            // client jar of this exact version.
+            var dataVersion = GameAssets.GetDataVersion(clientJar);
+            if (dataVersion > 0 && !HasLine(lines, "version:"))
+            {
+                lines.Add("version:" + dataVersion);
+                log("[brand] Added the options.txt version line (" + dataVersion + ") so the game keeps the pack selection.");
             }
 
             var packs = ReadListLine(lines, "resourcePacks:", log);
@@ -135,6 +152,15 @@ namespace FastCraft.Fast
                 ? "[brand] The FastCraft pack is on in options.txt."
                 : "[brand] The FastCraft pack was switched on in options.txt.");
             return true;
+        }
+
+        private static bool HasLine(List<string> lines, string key)
+        {
+            foreach (var line in lines)
+            {
+                if (line.TrimStart().StartsWith(key, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
         }
 
         /// <summary>Reads a JSON array that sits on one line of options.txt, like resourcePacks.</summary>
@@ -203,6 +229,10 @@ namespace FastCraft.Fast
                     {
                         state.Enabled = value == "1" || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
                     }
+                    if (string.Equals(key, "format", StringComparison.OrdinalIgnoreCase))
+                    {
+                        state.Format = value;
+                    }
                 }
             }
             catch
@@ -211,11 +241,16 @@ namespace FastCraft.Fast
             return state;
         }
 
-        private static void WriteState(string path, int version, bool enabled)
+        private static void WriteState(string path, int version, bool enabled, string format)
         {
             try
             {
-                File.WriteAllLines(path, new[] { "version=" + version, "enabled=" + (enabled ? "1" : "0") });
+                File.WriteAllLines(path, new[]
+                {
+                    "version=" + version,
+                    "enabled=" + (enabled ? "1" : "0"),
+                    "format=" + (format ?? "")
+                });
             }
             catch
             {

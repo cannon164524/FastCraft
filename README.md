@@ -87,13 +87,15 @@ the pause menu's corner, plus `modpack_mode = true` so its own editing UI stays 
 that is supposed to look like a client. The screen class names are read from the client jar.
 
 - **On by default for everyone.** Every launch of the edition puts `"file/FastCraft.zip"` into the
-  `resourcePacks` line of `instances\26.3\options.txt` if it is missing, keeping every other pack and
-  setting, and removes it from `incompatibleResourcePacks` so a pack the game once refused is not kept
-  refused. Switching it off by hand in Options therefore lasts until the next launch.
-- The pack declares `min_format` / `max_format`, the shape Minecraft wants since 25w31a, where they
-  replaced `pack_format`; 26.3 is resource format **97.1**, read from this version's own
-  `version.json`. The upper bound is open so a later release still accepts the pack. Writing the old
-  `pack_format: 1` fallback was what made the game call a working pack "incompatible".
+  `resourcePacks` line of `instances\26.3\options.txt` if it is missing, keeps every other pack and setting,
+  removes it from `incompatibleResourcePacks`, and writes the `version` line the game needs — an options.txt
+  without it is replaced with defaults, which silently threw the pack selection away. Switching it off by hand in
+  Options therefore lasts until the next launch.
+- The pack declares `min_format` / `max_format` as **integer arrays** — `[97, 0]` to `[97, 1]` for 26.3 — read from
+  this version's own `version.json` (`pack_version.resource.major` / `.minor`, strings since 25w31a). A decimal is
+  not a valid value, and a minimum below 65 without `pack_format` is rejected outright; either mistake makes the
+  game label the pack **"broken or incompatible"**, which is what happened before. When the format cannot be read,
+  the pack declares 65 and up instead of guessing a decimal.
 - The override of `menu.game` is **merged into the version's own `en_us.json`**, taken from the
   client jar. A pack's lang file replaces the whole file, so shipping only that one key would have
   turned every other label in the interface into raw translation keys.
