@@ -124,7 +124,7 @@ its own, which is what lets it work while the repository is private. It adds a t
 
 | Thing | Stats |
 | --- | --- |
-| `fastcraft:amber_ore` | 12 veins per chunk, y −16 to 48, stone or deepslate |
+| `fastcraft:amber_ore` | 8 veins per chunk, y −16 to 64, stone only |
 | `fastcraft:raw_amber` | drops from the ore, smelts or blasts into an ingot |
 | `fastcraft:amber_ingot` | the repair item and the crafting material |
 | `fastcraft:amber_sword` / `_pickaxe` / `_axe` / `_shovel` / `_hoe` | 220 uses, mining speed 5.5, 1.5 attack damage, level 12 |
@@ -133,10 +133,14 @@ Copper is 190 uses, speed 5, damage 1; iron is 250, speed 6, damage 2. The five 
 usual shapes and the ore is mined with a stone pickaxe or better.
 
 It sits in the creative inventory beside **Ingredients** (raw amber and the ingot), **Natural Blocks** (the ore)
-and **Tools** (the five tools). The ore replaces **stone only**, between y −16 and 64 — so in caves it is found
-in the stone band from about y 0 up to 64; the caves below y 0 are deepslate, and a deepslate amber ore is not
-part of the tier yet. Amber's own textures, models and blockstate replace the copper ones the mod ships as a
-placeholder.
+and **Tools & Utilities** (the five tools). The ore replaces **stone only**, between y −16 and 64 — so in caves
+it is found in the stone band from about y 0 up to 64; the caves below y 0 are deepslate, and a deepslate amber
+ore is not part of the tier yet.
+
+The art is drawn on the same **16×16 pixel grid** as the game's own textures: the vanilla tool silhouettes and
+two-tone bevels, in amber yellow and honey brown instead of copper's muted orange, so the set looks like
+Minecraft items rather than a different game's icons. Those textures, their models and the blockstate replace
+the copper placeholders the mod ships.
 
 Honest state: this is the first Java code in the project, so the 26.3 API and the Gradle/Loom version are
 resolved by the workflow from Fabric's and Modrinth's live data instead of being hard-coded, and the mod build
