@@ -182,6 +182,139 @@ namespace FastCraft.Fast
             return Render(visual, size, size);
         }
 
+        // ---------------------------------------------------------------- amber
+
+        private static readonly Color AmberDark = Color.FromRgb(0xB8, 0x77, 0x2E);
+        private static readonly Color AmberMid = Color.FromRgb(0xE0, 0x9B, 0x3E);
+        private static readonly Color Stick = Color.FromRgb(0x7A, 0x5A, 0x3A);
+
+        /// <summary>The amber ore: grey stone with amber blobs in it, not copper's green.</summary>
+        public static byte[] AmberOre(int width, int height)
+        {
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(Fill(Color.FromRgb(0x6E, 0x6E, 0x6E), 255), null, new Rect(0, 0, width, height));
+
+                var random = new Random(26);
+                var stone = Fill(Color.FromRgb(0x62, 0x62, 0x62), 255);
+                var lighter = Fill(Color.FromRgb(0x7B, 0x7B, 0x7B), 255);
+                var grain = Math.Max(1, width / 8);
+                for (int i = 0; i < 40; i++)
+                {
+                    dc.DrawRectangle(random.Next(2) == 0 ? stone : lighter, null,
+                        new Rect(random.Next(width), random.Next(height), grain, grain));
+                }
+
+                var dark = Fill(AmberDark, 255);
+                var amber = Fill(Accent, 255);
+                var light = Fill(AccentLight, 255);
+                for (int i = 0; i < 7; i++)
+                {
+                    var size = Math.Max(2, width / 5);
+                    var x = random.Next(Math.Max(1, width - size));
+                    var y = random.Next(Math.Max(1, height - size));
+                    dc.DrawRectangle(dark, null, new Rect(x, y, size, size));
+                    dc.DrawRectangle(amber, null, new Rect(x + 1, y + 1, Math.Max(1, size - 2), Math.Max(1, size - 2)));
+                    dc.DrawRectangle(light, null, new Rect(x + 1, y + 1, Math.Max(1, size / 3), Math.Max(1, size / 3)));
+                }
+            }
+            return Render(visual, width, height);
+        }
+
+        /// <summary>Raw amber: a few rough amber lumps, no stone around them.</summary>
+        public static byte[] RawAmber(int width, int height)
+        {
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                var random = new Random(11);
+                for (int i = 0; i < 5; i++)
+                {
+                    var size = Math.Max(3, width / 4);
+                    var x = width / 10 + random.Next(Math.Max(1, width / 2));
+                    var y = height / 10 + random.Next(Math.Max(1, height / 2));
+                    dc.DrawRoundedRectangle(Fill(AmberDark, 255), null, new Rect(x, y, size, size), size / 3, size / 3);
+                    dc.DrawRoundedRectangle(Fill(AmberMid, 255), null,
+                        new Rect(x + 1, y + 1, Math.Max(1, size - 2), Math.Max(1, size - 2)), size / 4, size / 4);
+                    dc.DrawRoundedRectangle(Fill(AccentLight, 255), null,
+                        new Rect(x + 2, y + 2, Math.Max(1, size / 3), Math.Max(1, size / 3)), size / 6, size / 6);
+                }
+            }
+            return Render(visual, width, height);
+        }
+
+        /// <summary>An amber ingot: one bar with a lit top edge.</summary>
+        public static byte[] AmberIngot(int width, int height)
+        {
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                var bar = new Rect(width * 0.13, height * 0.31, width * 0.74, height * 0.38);
+                dc.DrawRoundedRectangle(Fill(AmberDark, 255), null, bar, height * 0.12, height * 0.12);
+                dc.DrawRoundedRectangle(Fill(Accent, 255), null,
+                    new Rect(width * 0.18, height * 0.35, width * 0.64, height * 0.22), height * 0.09, height * 0.09);
+                dc.DrawRectangle(Fill(AccentLight, 255), null,
+                    new Rect(width * 0.24, height * 0.38, width * 0.5, Math.Max(1, height * 0.06)));
+            }
+            return Render(visual, width, height);
+        }
+
+        /// <summary>One amber tool: a wooden handle, and a head whose shape says which tool it is.</summary>
+        public static byte[] AmberTool(int width, int height, string kind)
+        {
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                var handle = new Pen(Fill(Stick, 255), Math.Max(1, width * 0.13))
+                {
+                    StartLineCap = PenLineCap.Round,
+                    EndLineCap = PenLineCap.Round
+                };
+                dc.DrawLine(handle, new Point(width * 0.26, height * 0.88), new Point(width * 0.66, height * 0.4));
+
+                var dark = Fill(AmberDark, 255);
+                var amber = Fill(Accent, 255);
+                var light = Fill(AccentLight, 255);
+
+                if (kind == "sword")
+                {
+                    dc.DrawLine(new Pen(dark, Math.Max(2, width * 0.18)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.3, height * 0.82), new Point(width * 0.82, height * 0.18));
+                    dc.DrawLine(new Pen(light, Math.Max(1, width * 0.06)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.34, height * 0.76), new Point(width * 0.8, height * 0.22));
+                }
+                else if (kind == "pickaxe")
+                {
+                    dc.DrawLine(new Pen(dark, Math.Max(2, width * 0.16)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.24, height * 0.34), new Point(width * 0.8, height * 0.28));
+                    dc.DrawLine(new Pen(amber, Math.Max(1, width * 0.1)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.3, height * 0.34), new Point(width * 0.76, height * 0.3));
+                }
+                else if (kind == "axe")
+                {
+                    dc.DrawRoundedRectangle(dark, null, new Rect(width * 0.5, height * 0.12, width * 0.38, height * 0.32), width * 0.08, width * 0.08);
+                    dc.DrawRoundedRectangle(amber, null, new Rect(width * 0.54, height * 0.16, width * 0.28, height * 0.22), width * 0.06, width * 0.06);
+                    dc.DrawRectangle(light, null, new Rect(width * 0.58, height * 0.18, width * 0.12, Math.Max(1, height * 0.05)));
+                }
+                else if (kind == "shovel")
+                {
+                    dc.DrawRoundedRectangle(dark, null, new Rect(width * 0.58, height * 0.1, width * 0.3, height * 0.26), width * 0.1, width * 0.1);
+                    dc.DrawRoundedRectangle(amber, null, new Rect(width * 0.61, height * 0.13, width * 0.24, height * 0.18), width * 0.08, width * 0.08);
+                }
+                else
+                {
+                    dc.DrawLine(new Pen(dark, Math.Max(2, width * 0.14)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.6, height * 0.3), new Point(width * 0.84, height * 0.28));
+                    dc.DrawLine(new Pen(dark, Math.Max(2, width * 0.14)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.8, height * 0.3), new Point(width * 0.82, height * 0.12));
+                    dc.DrawLine(new Pen(amber, Math.Max(1, width * 0.06)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.63, height * 0.3), new Point(width * 0.8, height * 0.28));
+                }
+            }
+            return Render(visual, width, height);
+        }
+
         // ---------------------------------------------------------------- drawing helpers
 
         private static void DrawChevrons(DrawingContext dc, Rect box, Color color, double thickness)

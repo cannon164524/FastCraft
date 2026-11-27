@@ -132,6 +132,12 @@ its own, which is what lets it work while the repository is private. It adds a t
 Copper is 190 uses, speed 5, damage 1; iron is 250, speed 6, damage 2. The five tools are crafted in the
 usual shapes and the ore is mined with a stone pickaxe or better.
 
+It sits in the creative inventory beside **Ingredients** (raw amber and the ingot), **Natural Blocks** (the ore)
+and **Tools** (the five tools). The ore replaces **stone only**, between y −16 and 64 — so in caves it is found
+in the stone band from about y 0 up to 64; the caves below y 0 are deepslate, and a deepslate amber ore is not
+part of the tier yet. Amber's own textures, models and blockstate replace the copper ones the mod ships as a
+placeholder.
+
 Honest state: this is the first Java code in the project, so the 26.3 API and the Gradle/Loom version are
 resolved by the workflow from Fabric's and Modrinth's live data instead of being hard-coded, and the mod build
 step is allowed to fail without stopping the launcher release — the log names the call that moved. The ore's and

@@ -5,6 +5,8 @@ import java.util.function.UnaryOperator;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.biome.v1.BiomeModifications;
 import net.fabricmc.fabric.api.biome.v1.BiomeSelectors;
+import net.fabricmc.fabric.api.itemgroup.v1.CreativeModeTabEvents;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -72,6 +74,23 @@ public class FastCraftMod implements ModInitializer
 
         BiomeModifications.addFeature(BiomeSelectors.foundInOverworld(),
             GenerationStep.Decoration.UNDERGROUND_ORES, AMBER_ORE_PLACED);
+
+        // Findable in the creative inventory, beside the material each thing belongs to.
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.INGREDIENTS).register(output ->
+        {
+            output.accept(RAW_AMBER);
+            output.accept(AMBER_INGOT);
+        });
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.NATURAL_BLOCKS).register(output ->
+            output.accept(AMBER_ORE_ITEM));
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS).register(output ->
+        {
+            output.accept(AMBER_SWORD);
+            output.accept(AMBER_PICKAXE);
+            output.accept(AMBER_AXE);
+            output.accept(AMBER_SHOVEL);
+            output.accept(AMBER_HOE);
+        });
     }
 
     private static Item item(String name, Item.Properties properties)

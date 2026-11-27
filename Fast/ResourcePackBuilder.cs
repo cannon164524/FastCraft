@@ -34,24 +34,34 @@ namespace FastCraft.Fast
 
         private sealed class TextureTarget
         {
+            public readonly string Namespace;
             public readonly string Path;
             public readonly int DefaultWidth;
             public readonly int DefaultHeight;
             public readonly int Scale;
+            public readonly bool InIndex;
             public readonly Func<int, int, byte[]> Draw;
 
             public TextureTarget(string path, int defaultWidth, int defaultHeight, Func<int, int, byte[]> draw)
-                : this(path, defaultWidth, defaultHeight, 2, draw)
+                : this("minecraft", path, defaultWidth, defaultHeight, 2, true, draw)
             {
             }
 
             public TextureTarget(string path, int defaultWidth, int defaultHeight, int scale,
                 Func<int, int, byte[]> draw)
+                : this("minecraft", path, defaultWidth, defaultHeight, scale, true, draw)
             {
+            }
+
+            public TextureTarget(string @namespace, string path, int defaultWidth, int defaultHeight, int scale,
+                bool inIndex, Func<int, int, byte[]> draw)
+            {
+                Namespace = @namespace;
                 Path = path;
                 DefaultWidth = defaultWidth;
                 DefaultHeight = defaultHeight;
                 Scale = Math.Max(1, scale);
+                InIndex = inIndex;
                 Draw = draw;
             }
         }
@@ -150,19 +160,39 @@ namespace FastCraft.Fast
                 new TextureTarget("textures/gui/menu_background.png", 32, 32,
                     (width, height) => BrandArt.Tile(width, height)),
                 new TextureTarget("textures/gui/options_background.png", 16, 16,
-                    (width, height) => BrandArt.Tile(width, height))
+                    (width, height) => BrandArt.Tile(width, height)),
+
+                // The amber tier's own art. It lives in the fastcraft namespace, so the models the
+                // mod ships for copper are replaced by FastCraft's own ore, ingot and tools.
+                new TextureTarget("fastcraft", "textures/block/amber_ore.png", 16, 16, 2, false,
+                    (width, height) => BrandArt.AmberOre(width, height)),
+                new TextureTarget("fastcraft", "textures/item/raw_amber.png", 16, 16, 2, false,
+                    (width, height) => BrandArt.RawAmber(width, height)),
+                new TextureTarget("fastcraft", "textures/item/amber_ingot.png", 16, 16, 2, false,
+                    (width, height) => BrandArt.AmberIngot(width, height)),
+                new TextureTarget("fastcraft", "textures/item/amber_sword.png", 16, 16, 2, false,
+                    (width, height) => BrandArt.AmberTool(width, height, "sword")),
+                new TextureTarget("fastcraft", "textures/item/amber_pickaxe.png", 16, 16, 2, false,
+                    (width, height) => BrandArt.AmberTool(width, height, "pickaxe")),
+                new TextureTarget("fastcraft", "textures/item/amber_axe.png", 16, 16, 2, false,
+                    (width, height) => BrandArt.AmberTool(width, height, "axe")),
+                new TextureTarget("fastcraft", "textures/item/amber_shovel.png", 16, 16, 2, false,
+                    (width, height) => BrandArt.AmberTool(width, height, "shovel")),
+                new TextureTarget("fastcraft", "textures/item/amber_hoe.png", 16, 16, 2, false,
+                    (width, height) => BrandArt.AmberTool(width, height, "hoe"))
             };
 
             foreach (var target in targets)
             {
                 int width;
                 int height;
-                var present = assets.TryGetSize("minecraft/" + target.Path, out width, out height);
+                var present = target.InIndex
+                              && assets.TryGetSize(target.Namespace + "/" + target.Path, out width, out height);
                 if (!present)
                 {
                     width = target.DefaultWidth;
                     height = target.DefaultHeight;
-                    result.Absent.Add(System.IO.Path.GetFileName(target.Path));
+                    if (target.InIndex) result.Absent.Add(System.IO.Path.GetFileName(target.Path));
                 }
                 else
                 {
@@ -177,7 +207,14 @@ namespace FastCraft.Fast
                     result.TitleSize = width + "×" + height;
                 }
 
-                files["assets/minecraft/" + target.Path] = target.Draw(width, height);
+                files["assets/" + target.Namespace + "/" + target.Path] = target.Draw(width, height);
+            }
+
+            // The mod's items point at copper's models; these files replace those pointers, so the
+            // ore, the ingot and the five tools are drawn and named as amber instead.
+            foreach (var pair in AmberJson())
+            {
+                files[pair.Key] = Encoding.UTF8.GetBytes(pair.Value);
             }
 
             // The title screen's panorama is a cubemap that spins; dark gradients with a little
@@ -190,6 +227,56 @@ namespace FastCraft.Fast
 
             // The pack thumbnail, so it is recognisable in the resource pack list.
             files["pack.png"] = BrandArt.PackIcon(128);
+
+            return files;
+        }
+
+        /// <summary>
+        /// The mod's amber items are pointed at copper's models so they exist before this pack does.
+        /// These files replace those pointers: the ore, the ingot and the five tools are drawn from
+        /// FastCraft's own art and the block is named Amber Ore in the game.
+        /// </summary>
+        private static Dictionary<string, string> AmberJson()
+        {
+            var files = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            files["assets/fastcraft/blockstates/amber_ore.json"] =
+                "{\"variants\":{\"\":{\"model\":\"fastcraft:block/amber_ore\"}}}";
+            files["assets/fastcraft/models/block/amber_ore.json"] =
+                "{\"parent\":\"minecraft:block/cube_all\",\"textures\":{\"all\":\"fastcraft:block/amber_ore\"}}";
+
+            var generated = new[]
+            {
+                "raw_amber", "amber_ingot"
+            };
+            foreach (var item in generated)
+            {
+                files["assets/fastcraft/models/item/" + item + ".json"] =
+                    "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"fastcraft:item/" + item + "\"}}";
+            }
+
+            var tools = new[]
+            {
+                "amber_sword", "amber_pickaxe", "amber_axe", "amber_shovel", "amber_hoe"
+            };
+            foreach (var tool in tools)
+            {
+                files["assets/fastcraft/models/item/" + tool + ".json"] =
+                    "{\"parent\":\"minecraft:item/handheld\",\"textures\":{\"layer0\":\"fastcraft:item/" + tool + "\"}}";
+            }
+
+            files["assets/fastcraft/items/amber_ore.json"] =
+                "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"fastcraft:block/amber_ore\"}}";
+            foreach (var item in generated)
+            {
+                files["assets/fastcraft/items/" + item + ".json"] =
+                    "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"fastcraft:item/" + item + "\"}}";
+            }
+            foreach (var tool in tools)
+            {
+                files["assets/fastcraft/items/" + tool + ".json"] =
+                    "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"fastcraft:item/" + tool + "\"}}";
+            }
 
             return files;
         }
