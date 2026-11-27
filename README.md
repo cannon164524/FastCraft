@@ -26,13 +26,17 @@ What it installs, newest release build per project for that game version from Mo
 | --- | --- |
 | Sodium | the chunk renderer |
 | Lithium | game logic and ticking |
-| FerriteCore | memory use |
 | Krypton | the network stack |
 | ImmediatelyFast | batched immediate rendering |
 | EntityCulling | entities you cannot see |
 | MoreCulling | hidden block faces |
 | ModernFix | load time and memory |
 | Fabric API | the interfaces the others are built on |
+
+FerriteCore is deliberately not installed: its newest build is for an older game version and only carries a 26.3
+tag, so it would risk a crash for a small memory gain. ModernFix has no 26.x build at all today, so it is skipped
+by the rule below and joins automatically when it publishes one. MoreCulling's required Cloth Config is fetched with
+it.
 
 A mod with no build for the supported version is **skipped and logged**, never guessed at. Required dependencies of
 whatever resolves are fetched with it. The launcher keeps a list of the jars it installed
@@ -52,8 +56,13 @@ simulation distance, fewer particles, no entity shadows, vsync off, 260 FPS cap.
 game's video settings; FastCraft will not overwrite it.
 
 **When it cannot be installed** — Fabric has no build for the version yet, Modrinth is unreachable, a download fails
-— the game still starts, as plain vanilla, and the window log says what happened in a line beginning `[fast]`. Knowing
-that is better than a launch that dies or a silence that hides it.
+— the game still starts, as plain vanilla; the window says so in a message and the log explains it in lines beginning
+`[fast]`. Knowing that is better than a launch that dies or a silence that hides it.
+
+The mods folder is reported in the log on every launch: `[fast] Mods folder: … (N jar(s) before this launch)`, then
+`[fast] Mods folder now has M jar(s), K from the FastCraft set`, then one line per jar it installed. If the set is
+not there, those lines say where it went — usually `Modrinth … has no 26.3 build yet; skipping it`, which is the
+publisher telling us there is nothing to install yet, not a launcher bug.
 
 
 ## The interface

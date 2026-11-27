@@ -144,7 +144,10 @@ namespace FastCraft.Fast
 
             var modsDirectory = Path.Combine(gameDirectory, "mods");
             Directory.CreateDirectory(modsDirectory);
+            log("[fast] Mods folder: " + modsDirectory + " (" + CountJars(modsDirectory) + " jar(s) before this launch).");
+
             var installed = await InstallModsAsync(modsDirectory, mods, log, cancellationToken).ConfigureAwait(false);
+            log("[fast] Mods folder now has " + CountJars(modsDirectory) + " jar(s), " + installed + " from the FastCraft set.");
 
             // A performance preset, written only into a game folder that has none: options the
             // player changed are never overwritten.
@@ -154,6 +157,18 @@ namespace FastCraft.Fast
             result.MainClass = mainClass;
             result.Summary = "Fabric loader " + loaderVersion + ", " + installed + " mods, performance preset";
             return result;
+        }
+
+        private static int CountJars(string directory)
+        {
+            try
+            {
+                return Directory.GetFiles(directory, "*.jar").Length;
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         /// <summary>

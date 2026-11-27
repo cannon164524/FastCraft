@@ -37,6 +37,25 @@ namespace FastCraft.Game
         public event Action<string> Crashed;
 
         /// <summary>
+        /// Raised with the reason when the performance layer could not be added and the game
+        /// starts as vanilla instead. May be raised on any thread.
+        /// </summary>
+        public event Action<string> EditionFailed;
+
+        private void RaiseEditionFailed(string message)
+        {
+            var handler = EditionFailed;
+            if (handler == null) return;
+            try
+            {
+                handler(message);
+            }
+            catch
+            {
+            }
+        }
+
+        /// <summary>
         /// Starts Minecraft. With <paramref name="fastEdition"/> the game is started through the
         /// FastCraft edition: the Fabric loader, the performance mods and the preset are put in
         /// place first, and the game runs on Fabric's main class. If any of that cannot be
@@ -72,6 +91,7 @@ namespace FastCraft.Game
                     else
                     {
                         log("[fast] FastCraft edition not available (" + edition.Problem + "). Starting vanilla Minecraft.");
+                        RaiseEditionFailed("the performance mods could not be added: " + edition.Problem + ".");
                     }
                 }
                 catch (OperationCanceledException)
@@ -81,6 +101,7 @@ namespace FastCraft.Game
                 catch (Exception ex)
                 {
                     log("[fast] FastCraft edition could not be installed: " + ex.Message + " Starting vanilla Minecraft.");
+                    RaiseEditionFailed("the performance mods could not be added: " + ex.Message + ".");
                 }
             }
 

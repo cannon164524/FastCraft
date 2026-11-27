@@ -57,7 +57,7 @@ namespace FastCraft.Fast
             VersionData parsed;
             try
             {
-                parsed = VersionParser.Parse(json);
+                parsed = VersionParser.Parse(json, "https://maven.fabricmc.net/");
             }
             catch
             {

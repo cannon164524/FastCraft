@@ -41,14 +41,15 @@ namespace FastCraft.Fast
 
         /// <summary>
         /// The performance layer, in the order it is worth explaining: what draws the world,
-        /// what ticks it, what it keeps in memory, what travels over the network, what is
-        /// hidden from the camera, and the library the rest is built on.
+        /// what ticks it, what travels over the network, what is hidden from the camera, and
+        /// the library the rest is built on. FerriteCore is deliberately absent: its newest
+        /// build was made for an older game version and only carries a 26.3 tag, so installing
+        /// it risks a crash for a small memory gain.
         /// </summary>
         public static readonly Mod[] Mods =
         {
             new Mod("sodium", "Sodium", "rewritten chunk renderer"),
             new Mod("lithium", "Lithium", "game logic and ticking"),
-            new Mod("ferrite-core", "FerriteCore", "smaller memory footprint"),
             new Mod("krypton", "Krypton", "network stack"),
             new Mod("immediatelyfast", "ImmediatelyFast", "batched immediate rendering"),
             new Mod("entityculling", "EntityCulling", "skips entities you cannot see"),

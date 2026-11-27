@@ -13,6 +13,16 @@ namespace FastCraft.Game
     {
         public static VersionData Parse(string json)
         {
+            return Parse(json, null);
+        }
+
+        /// <summary>
+        /// Parses a version JSON. <paramref name="defaultMavenBase"/> is the Maven repository
+        /// for libraries that carry no "downloads" block and no "url" of their own: Fabric's
+        /// profile is built that way, and its own Maven hosts those jars.
+        /// </summary>
+        public static VersionData Parse(string json, string defaultMavenBase)
+        {
             using (var document = JsonDocument.Parse(json))
             {
                 var root = document.RootElement;
@@ -62,7 +72,7 @@ namespace FastCraft.Game
                 {
                     foreach (var library in element.EnumerateArray())
                     {
-                        ParseLibrary(library, version.Libraries);
+                        ParseLibrary(library, version.Libraries, defaultMavenBase);
                     }
                 }
 
@@ -103,7 +113,7 @@ namespace FastCraft.Game
             }
         }
 
-        private static void ParseLibrary(JsonElement library, List<LibraryInfo> target)
+        private static void ParseLibrary(JsonElement library, List<LibraryInfo> target, string defaultMavenBase)
         {
             var rules = ParseRules(library);
             if (!RulesAllow(rules, null)) return;
@@ -112,7 +122,7 @@ namespace FastCraft.Game
             if (string.IsNullOrEmpty(name)) return;
 
             var info = new LibraryInfo { Name = name, Key = LibraryKey(name) };
-            var mavenBase = JsonHelp.GetString(library, "url") ?? "https://libraries.minecraft.net/";
+            var mavenBase = JsonHelp.GetString(library, "url") ?? defaultMavenBase ?? "https://libraries.minecraft.net/";
 
             JsonElement downloads;
             bool hasDownloads = library.TryGetProperty("downloads", out downloads) && downloads.ValueKind == JsonValueKind.Object;

@@ -60,6 +60,7 @@ namespace FastCraft
             _timer.Tick += Timer_Tick;
 
             _launcher.Crashed += OnGameCrashed;
+            _launcher.EditionFailed += OnEditionFailed;
 
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
@@ -709,6 +710,20 @@ namespace FastCraft
                 message + Environment.NewLine + Environment.NewLine
                 + "Those two files hold the reason; the log above also has the game's output.",
                 "Minecraft crashed", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        private void OnEditionFailed(string message)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action<string>(OnEditionFailed), message);
+                return;
+            }
+            Log("[fast] " + message + " Minecraft is starting as vanilla.");
+            MessageBox.Show(this,
+                "FastCraft could not make this launch fast: " + message + Environment.NewLine + Environment.NewLine
+                + "Minecraft still starts, as vanilla. The window's log has the details.",
+                "FastCraft edition", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private static bool IsValidPlayerName(string name)
