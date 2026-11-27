@@ -184,132 +184,153 @@ namespace FastCraft.Fast
 
         // ---------------------------------------------------------------- amber
 
-        private static readonly Color AmberDark = Color.FromRgb(0xB8, 0x77, 0x2E);
-        private static readonly Color AmberMid = Color.FromRgb(0xE0, 0x9B, 0x3E);
+        // Copper is a soft brown-orange on grey stone, so amber is drawn to be nothing like it:
+        // glowing yellow gems with near-white glints inside a dark brown outline, on blue-grey stone.
+        private static readonly Color AmberGem = Color.FromRgb(0xFF, 0xC2, 0x36);
+        private static readonly Color AmberGlint = Color.FromRgb(0xFF, 0xF6, 0xC4);
+        private static readonly Color AmberShadow = Color.FromRgb(0xA8, 0x5A, 0x0C);
+        private static readonly Color AmberOutline = Color.FromRgb(0x3E, 0x1E, 0x06);
+        private static readonly Color AmberStone = Color.FromRgb(0x3C, 0x42, 0x4E);
+        private static readonly Color AmberStoneGrain = Color.FromRgb(0x33, 0x38, 0x43);
         private static readonly Color Stick = Color.FromRgb(0x7A, 0x5A, 0x3A);
 
-        /// <summary>The amber ore: grey stone with amber blobs in it, not copper's green.</summary>
+        /// <summary>One cut amber gem: dark outline, deep shadow, bright face, white glint.</summary>
+        private static void DrawGem(DrawingContext dc, double x, double y, double size)
+        {
+            var outline = new Pen(Fill(AmberOutline, 255), Math.Max(1, size * 0.16));
+            dc.DrawRoundedRectangle(Fill(AmberShadow, 255), outline, new Rect(x, y, size, size),
+                size * 0.24, size * 0.24);
+            dc.DrawRoundedRectangle(Fill(AmberGem, 255), null,
+                new Rect(x + size * 0.16, y + size * 0.16, size * 0.68, size * 0.68), size * 0.2, size * 0.2);
+            dc.DrawRectangle(Fill(AmberGlint, 255), null,
+                new Rect(x + size * 0.24, y + size * 0.24, Math.Max(1, size * 0.24), Math.Max(1, size * 0.24)));
+        }
+
+        /// <summary>The ore: blue-grey stone with four big glowing gems, unlike copper's small specks.</summary>
         public static byte[] AmberOre(int width, int height)
         {
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
-                dc.DrawRectangle(Fill(Color.FromRgb(0x6E, 0x6E, 0x6E), 255), null, new Rect(0, 0, width, height));
+                dc.DrawRectangle(Fill(AmberStone, 255), null, new Rect(0, 0, width, height));
 
                 var random = new Random(26);
-                var stone = Fill(Color.FromRgb(0x62, 0x62, 0x62), 255);
-                var lighter = Fill(Color.FromRgb(0x7B, 0x7B, 0x7B), 255);
-                var grain = Math.Max(1, width / 8);
-                for (int i = 0; i < 40; i++)
+                var grain = Math.Max(1, width / 9);
+                var grainBrush = Fill(AmberStoneGrain, 255);
+                var lighter = Fill(Color.FromRgb(0x47, 0x4E, 0x5B), 255);
+                for (int i = 0; i < 30; i++)
                 {
-                    dc.DrawRectangle(random.Next(2) == 0 ? stone : lighter, null,
+                    dc.DrawRectangle(random.Next(3) == 0 ? lighter : grainBrush, null,
                         new Rect(random.Next(width), random.Next(height), grain, grain));
                 }
 
-                var dark = Fill(AmberDark, 255);
-                var amber = Fill(Accent, 255);
-                var light = Fill(AccentLight, 255);
-                for (int i = 0; i < 7; i++)
-                {
-                    var size = Math.Max(2, width / 5);
-                    var x = random.Next(Math.Max(1, width - size));
-                    var y = random.Next(Math.Max(1, height - size));
-                    dc.DrawRectangle(dark, null, new Rect(x, y, size, size));
-                    dc.DrawRectangle(amber, null, new Rect(x + 1, y + 1, Math.Max(1, size - 2), Math.Max(1, size - 2)));
-                    dc.DrawRectangle(light, null, new Rect(x + 1, y + 1, Math.Max(1, size / 3), Math.Max(1, size / 3)));
-                }
+                var size = Math.Max(4, width * 0.3);
+                DrawGem(dc, width * 0.08, height * 0.1, size);
+                DrawGem(dc, width * 0.58, height * 0.06, size);
+                DrawGem(dc, width * 0.3, height * 0.56, size);
+                DrawGem(dc, width * 0.72, height * 0.55, size);
             }
             return Render(visual, width, height);
         }
 
-        /// <summary>Raw amber: a few rough amber lumps, no stone around them.</summary>
+        /// <summary>Raw amber: four bright crystal shards, no stone around them.</summary>
         public static byte[] RawAmber(int width, int height)
         {
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
-                var random = new Random(11);
-                for (int i = 0; i < 5; i++)
-                {
-                    var size = Math.Max(3, width / 4);
-                    var x = width / 10 + random.Next(Math.Max(1, width / 2));
-                    var y = height / 10 + random.Next(Math.Max(1, height / 2));
-                    dc.DrawRoundedRectangle(Fill(AmberDark, 255), null, new Rect(x, y, size, size), size / 3, size / 3);
-                    dc.DrawRoundedRectangle(Fill(AmberMid, 255), null,
-                        new Rect(x + 1, y + 1, Math.Max(1, size - 2), Math.Max(1, size - 2)), size / 4, size / 4);
-                    dc.DrawRoundedRectangle(Fill(AccentLight, 255), null,
-                        new Rect(x + 2, y + 2, Math.Max(1, size / 3), Math.Max(1, size / 3)), size / 6, size / 6);
-                }
+                var size = Math.Max(5, width * 0.42);
+                DrawGem(dc, width * 0.06, height * 0.24, size);
+                DrawGem(dc, width * 0.46, height * 0.04, size);
+                DrawGem(dc, width * 0.3, height * 0.5, size);
             }
             return Render(visual, width, height);
         }
 
-        /// <summary>An amber ingot: one bar with a lit top edge.</summary>
+        /// <summary>An amber ingot: a bright bar with a dark outline and two facets.</summary>
         public static byte[] AmberIngot(int width, int height)
         {
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
-                var bar = new Rect(width * 0.13, height * 0.31, width * 0.74, height * 0.38);
-                dc.DrawRoundedRectangle(Fill(AmberDark, 255), null, bar, height * 0.12, height * 0.12);
-                dc.DrawRoundedRectangle(Fill(Accent, 255), null,
-                    new Rect(width * 0.18, height * 0.35, width * 0.64, height * 0.22), height * 0.09, height * 0.09);
-                dc.DrawRectangle(Fill(AccentLight, 255), null,
-                    new Rect(width * 0.24, height * 0.38, width * 0.5, Math.Max(1, height * 0.06)));
+                var outline = new Pen(Fill(AmberOutline, 255), Math.Max(1, width * 0.07));
+                var bar = new Rect(width * 0.12, height * 0.3, width * 0.76, height * 0.4);
+                dc.DrawRoundedRectangle(Fill(AmberShadow, 255), outline, bar, height * 0.12, height * 0.12);
+                dc.DrawRoundedRectangle(Fill(AmberGem, 255), null,
+                    new Rect(width * 0.18, height * 0.35, width * 0.64, height * 0.24), height * 0.09, height * 0.09);
+                dc.DrawRectangle(Fill(AmberGlint, 255), null,
+                    new Rect(width * 0.24, height * 0.38, width * 0.4, Math.Max(1, height * 0.07)));
+                dc.DrawRectangle(Fill(AmberShadow, 255), null,
+                    new Rect(width * 0.7, height * 0.42, width * 0.1, Math.Max(1, height * 0.2)));
             }
             return Render(visual, width, height);
         }
 
-        /// <summary>One amber tool: a wooden handle, and a head whose shape says which tool it is.</summary>
+        /// <summary>
+        /// One amber tool: a wooden handle with two amber bands, and a bright, dark-outlined head
+        /// whose shape says which tool it is — nowhere near copper's flat brown heads.
+        /// </summary>
         public static byte[] AmberTool(int width, int height, string kind)
         {
             var visual = new DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
-                var handle = new Pen(Fill(Stick, 255), Math.Max(1, width * 0.13))
+                var handle = new Pen(Fill(Stick, 255), Math.Max(1, width * 0.12))
                 {
                     StartLineCap = PenLineCap.Round,
                     EndLineCap = PenLineCap.Round
                 };
-                dc.DrawLine(handle, new Point(width * 0.26, height * 0.88), new Point(width * 0.66, height * 0.4));
+                dc.DrawLine(handle, new Point(width * 0.27, height * 0.9), new Point(width * 0.63, height * 0.46));
 
-                var dark = Fill(AmberDark, 255);
-                var amber = Fill(Accent, 255);
-                var light = Fill(AccentLight, 255);
+                var band = new Pen(Fill(AmberGem, 255), Math.Max(1, width * 0.08));
+                dc.DrawLine(band, new Point(width * 0.36, height * 0.76), new Point(width * 0.41, height * 0.7));
+                dc.DrawLine(band, new Point(width * 0.47, height * 0.62), new Point(width * 0.52, height * 0.56));
+
+                var outline = Fill(AmberOutline, 255);
+                var gem = Fill(AmberGem, 255);
+                var glint = Fill(AmberGlint, 255);
 
                 if (kind == "sword")
                 {
-                    dc.DrawLine(new Pen(dark, Math.Max(2, width * 0.18)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
-                        new Point(width * 0.3, height * 0.82), new Point(width * 0.82, height * 0.18));
-                    dc.DrawLine(new Pen(light, Math.Max(1, width * 0.06)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
-                        new Point(width * 0.34, height * 0.76), new Point(width * 0.8, height * 0.22));
+                    dc.DrawLine(new Pen(outline, Math.Max(3, width * 0.22)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.3, height * 0.86), new Point(width * 0.84, height * 0.16));
+                    dc.DrawLine(new Pen(gem, Math.Max(2, width * 0.12)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.33, height * 0.8), new Point(width * 0.82, height * 0.19));
+                    dc.DrawLine(new Pen(glint, Math.Max(1, width * 0.05)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.37, height * 0.72), new Point(width * 0.66, height * 0.4));
                 }
                 else if (kind == "pickaxe")
                 {
-                    dc.DrawLine(new Pen(dark, Math.Max(2, width * 0.16)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
-                        new Point(width * 0.24, height * 0.34), new Point(width * 0.8, height * 0.28));
-                    dc.DrawLine(new Pen(amber, Math.Max(1, width * 0.1)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
-                        new Point(width * 0.3, height * 0.34), new Point(width * 0.76, height * 0.3));
+                    dc.DrawLine(new Pen(outline, Math.Max(3, width * 0.2)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.2, height * 0.36), new Point(width * 0.84, height * 0.28));
+                    dc.DrawLine(new Pen(gem, Math.Max(2, width * 0.11)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.26, height * 0.35), new Point(width * 0.8, height * 0.29));
+                    dc.DrawRectangle(glint, null, new Rect(width * 0.42, height * 0.28, width * 0.12, Math.Max(1, height * 0.05)));
                 }
                 else if (kind == "axe")
                 {
-                    dc.DrawRoundedRectangle(dark, null, new Rect(width * 0.5, height * 0.12, width * 0.38, height * 0.32), width * 0.08, width * 0.08);
-                    dc.DrawRoundedRectangle(amber, null, new Rect(width * 0.54, height * 0.16, width * 0.28, height * 0.22), width * 0.06, width * 0.06);
-                    dc.DrawRectangle(light, null, new Rect(width * 0.58, height * 0.18, width * 0.12, Math.Max(1, height * 0.05)));
+                    var head = new Rect(width * 0.46, height * 0.08, width * 0.44, height * 0.36);
+                    dc.DrawRoundedRectangle(outline, null, head, width * 0.1, width * 0.1);
+                    dc.DrawRoundedRectangle(gem, null, new Rect(width * 0.51, height * 0.12, width * 0.32, height * 0.26), width * 0.08, width * 0.08);
+                    dc.DrawRectangle(glint, null, new Rect(width * 0.56, height * 0.15, width * 0.12, Math.Max(1, height * 0.07)));
+                    dc.DrawRectangle(Fill(AmberShadow, 255), null, new Rect(width * 0.75, height * 0.16, width * 0.08, Math.Max(1, height * 0.2)));
                 }
                 else if (kind == "shovel")
                 {
-                    dc.DrawRoundedRectangle(dark, null, new Rect(width * 0.58, height * 0.1, width * 0.3, height * 0.26), width * 0.1, width * 0.1);
-                    dc.DrawRoundedRectangle(amber, null, new Rect(width * 0.61, height * 0.13, width * 0.24, height * 0.18), width * 0.08, width * 0.08);
+                    var blade = new Rect(width * 0.54, height * 0.05, width * 0.38, height * 0.34);
+                    dc.DrawRoundedRectangle(outline, null, blade, width * 0.12, width * 0.12);
+                    dc.DrawRoundedRectangle(gem, null, new Rect(width * 0.58, height * 0.09, width * 0.3, height * 0.24), width * 0.1, width * 0.1);
+                    dc.DrawRectangle(glint, null, new Rect(width * 0.62, height * 0.12, width * 0.1, Math.Max(1, height * 0.1)));
                 }
                 else
                 {
-                    dc.DrawLine(new Pen(dark, Math.Max(2, width * 0.14)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
-                        new Point(width * 0.6, height * 0.3), new Point(width * 0.84, height * 0.28));
-                    dc.DrawLine(new Pen(dark, Math.Max(2, width * 0.14)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
-                        new Point(width * 0.8, height * 0.3), new Point(width * 0.82, height * 0.12));
-                    dc.DrawLine(new Pen(amber, Math.Max(1, width * 0.06)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
-                        new Point(width * 0.63, height * 0.3), new Point(width * 0.8, height * 0.28));
+                    dc.DrawLine(new Pen(outline, Math.Max(3, width * 0.18)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.5, height * 0.34), new Point(width * 0.9, height * 0.3));
+                    dc.DrawLine(new Pen(outline, Math.Max(3, width * 0.18)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.86, height * 0.34), new Point(width * 0.86, height * 0.1));
+                    dc.DrawLine(new Pen(gem, Math.Max(2, width * 0.09)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
+                        new Point(width * 0.54, height * 0.34), new Point(width * 0.86, height * 0.32));
+                    dc.DrawRectangle(glint, null, new Rect(width * 0.66, height * 0.29, width * 0.12, Math.Max(1, height * 0.05)));
                 }
             }
             return Render(visual, width, height);
