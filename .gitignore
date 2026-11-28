@@ -4,7 +4,7 @@ obj/
 *.user
 
 # Built by the workflow and embedded into the launcher, never committed.
-Assets/fastcraft-amber.jar
+Assets/fastcraft-ruby.jar
 fastcraft-mod/build/
 fastcraft-mod/.gradle/
 

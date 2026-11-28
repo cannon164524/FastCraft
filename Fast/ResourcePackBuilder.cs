@@ -160,26 +160,7 @@ namespace FastCraft.Fast
                 new TextureTarget("textures/gui/menu_background.png", 32, 32,
                     (width, height) => BrandArt.Tile(width, height)),
                 new TextureTarget("textures/gui/options_background.png", 16, 16,
-                    (width, height) => BrandArt.Tile(width, height)),
-
-                // The amber tier's own art. It lives in the fastcraft namespace, so the models the
-                // mod ships for copper are replaced by FastCraft's own ore, ingot and tools.
-                new TextureTarget("fastcraft", "textures/block/amber_ore.png", 16, 16, 2, false,
-                    (width, height) => BrandArt.AmberOre(width, height)),
-                new TextureTarget("fastcraft", "textures/item/raw_amber.png", 16, 16, 2, false,
-                    (width, height) => BrandArt.RawAmber(width, height)),
-                new TextureTarget("fastcraft", "textures/item/amber_ingot.png", 16, 16, 2, false,
-                    (width, height) => BrandArt.AmberIngot(width, height)),
-                new TextureTarget("fastcraft", "textures/item/amber_sword.png", 16, 16, 2, false,
-                    (width, height) => BrandArt.AmberTool(width, height, "sword")),
-                new TextureTarget("fastcraft", "textures/item/amber_pickaxe.png", 16, 16, 2, false,
-                    (width, height) => BrandArt.AmberTool(width, height, "pickaxe")),
-                new TextureTarget("fastcraft", "textures/item/amber_axe.png", 16, 16, 2, false,
-                    (width, height) => BrandArt.AmberTool(width, height, "axe")),
-                new TextureTarget("fastcraft", "textures/item/amber_shovel.png", 16, 16, 2, false,
-                    (width, height) => BrandArt.AmberTool(width, height, "shovel")),
-                new TextureTarget("fastcraft", "textures/item/amber_hoe.png", 16, 16, 2, false,
-                    (width, height) => BrandArt.AmberTool(width, height, "hoe"))
+                    (width, height) => BrandArt.Tile(width, height))
             };
 
             foreach (var target in targets)
@@ -212,9 +193,13 @@ namespace FastCraft.Fast
                 files["assets/" + target.Namespace + "/" + target.Path] = target.Draw(width, height);
             }
 
+            // The ruby tier's textures are the game's own, recoloured: the pixels, the outlines
+            // and the shading stay vanilla, only the colours become dark red.
+            AddRubyArt(files, assets, result);
+
             // The mod's items point at copper's models; these files replace those pointers, so the
-            // ore, the ingot and the five tools are drawn and named as amber instead.
-            foreach (var pair in AmberJson())
+            // ore, the gem and the five tools are ruby in the game.
+            foreach (var pair in RubyJson())
             {
                 files[pair.Key] = Encoding.UTF8.GetBytes(pair.Value);
             }
@@ -234,22 +219,58 @@ namespace FastCraft.Fast
         }
 
         /// <summary>
-        /// The mod's amber items are pointed at copper's models so they exist before this pack does.
-        /// These files replace those pointers: the ore, the ingot and the five tools are drawn from
-        /// FastCraft's own art and the block is named Amber Ore in the game.
+        /// The ruby set, taken from the game's own textures and recoloured to dark red. Nothing
+        /// is drawn by hand, so the items keep the exact pixels and silhouettes of the vanilla
+        /// art: an iron sword with ruby instead of steel, a diamond ore with rubies instead of
+        /// diamonds. A texture the game does not have is reported and left out.
         /// </summary>
-        private static Dictionary<string, string> AmberJson()
+        private static void AddRubyArt(Dictionary<string, byte[]> files, GameAssets assets, BrandingResult result)
+        {
+            var sources = new[]
+            {
+                new { Target = "textures/block/ruby_ore.png", Source = "minecraft/textures/block/diamond_ore.png", Mode = Recolour.Gem, Label = "ore" },
+                new { Target = "textures/item/raw_ruby.png", Source = "minecraft/textures/item/raw_iron.png", Mode = Recolour.MetalAll, Label = "raw ruby" },
+                new { Target = "textures/item/ruby_ingot.png", Source = "minecraft/textures/item/iron_ingot.png", Mode = Recolour.MetalAll, Label = "ruby" },
+                new { Target = "textures/item/ruby_sword.png", Source = "minecraft/textures/item/iron_sword.png", Mode = Recolour.Metal, Label = "sword" },
+                new { Target = "textures/item/ruby_pickaxe.png", Source = "minecraft/textures/item/iron_pickaxe.png", Mode = Recolour.Metal, Label = "pickaxe" },
+                new { Target = "textures/item/ruby_axe.png", Source = "minecraft/textures/item/iron_axe.png", Mode = Recolour.Metal, Label = "axe" },
+                new { Target = "textures/item/ruby_shovel.png", Source = "minecraft/textures/item/iron_shovel.png", Mode = Recolour.Metal, Label = "shovel" },
+                new { Target = "textures/item/ruby_hoe.png", Source = "minecraft/textures/item/iron_hoe.png", Mode = Recolour.Metal, Label = "hoe" }
+            };
+
+            foreach (var entry in sources)
+            {
+                byte[] original;
+                byte[] png;
+                if (!assets.TryRead(entry.Source, out original)
+                    || !VanillaRecolour.TryRecolour(original, entry.Mode, out png))
+                {
+                    result.Absent.Add(System.IO.Path.GetFileName(entry.Source));
+                    continue;
+                }
+
+                files["assets/fastcraft/" + entry.Target] = png;
+                result.Branded.Add("ruby " + entry.Label);
+            }
+        }
+
+        /// <summary>
+        /// The mod's ruby items are pointed at copper's models so they exist before this pack does.
+        /// These files replace those pointers: the ore, the gem and the five tools are drawn from
+        /// the recoloured vanilla textures.
+        /// </summary>
+        private static Dictionary<string, string> RubyJson()
         {
             var files = new Dictionary<string, string>(StringComparer.Ordinal);
 
-            files["assets/fastcraft/blockstates/amber_ore.json"] =
-                "{\"variants\":{\"\":{\"model\":\"fastcraft:block/amber_ore\"}}}";
-            files["assets/fastcraft/models/block/amber_ore.json"] =
-                "{\"parent\":\"minecraft:block/cube_all\",\"textures\":{\"all\":\"fastcraft:block/amber_ore\"}}";
+            files["assets/fastcraft/blockstates/ruby_ore.json"] =
+                "{\"variants\":{\"\":{\"model\":\"fastcraft:block/ruby_ore\"}}}";
+            files["assets/fastcraft/models/block/ruby_ore.json"] =
+                "{\"parent\":\"minecraft:block/cube_all\",\"textures\":{\"all\":\"fastcraft:block/ruby_ore\"}}";
 
             var generated = new[]
             {
-                "raw_amber", "amber_ingot"
+                "raw_ruby", "ruby_ingot"
             };
             foreach (var item in generated)
             {
@@ -259,7 +280,7 @@ namespace FastCraft.Fast
 
             var tools = new[]
             {
-                "amber_sword", "amber_pickaxe", "amber_axe", "amber_shovel", "amber_hoe"
+                "ruby_sword", "ruby_pickaxe", "ruby_axe", "ruby_shovel", "ruby_hoe"
             };
             foreach (var tool in tools)
             {
@@ -267,8 +288,8 @@ namespace FastCraft.Fast
                     "{\"parent\":\"minecraft:item/handheld\",\"textures\":{\"layer0\":\"fastcraft:item/" + tool + "\"}}";
             }
 
-            files["assets/fastcraft/items/amber_ore.json"] =
-                "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"fastcraft:block/amber_ore\"}}";
+            files["assets/fastcraft/items/ruby_ore.json"] =
+                "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"fastcraft:block/ruby_ore\"}}";
             foreach (var item in generated)
             {
                 files["assets/fastcraft/items/" + item + ".json"] =
@@ -339,7 +360,7 @@ namespace FastCraft.Fast
                 "Sodium, Lithium and a little Krypton!",
                 "Chunk loading, but with a plan!",
                 "Your frame rate called. It is fine now.",
-                "Made of amber and patience!",
+                "Made of ruby and patience!",
                 "Does this menu look faster?",
                 "Ticks optimised, blocks culled!",
                 "One launcher, one world, no waiting!",

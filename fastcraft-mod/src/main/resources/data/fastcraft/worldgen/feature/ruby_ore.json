@@ -4,7 +4,7 @@
   "size": 8,
   "targets": [
     {
-      "state": "fastcraft:amber_ore",
+      "state": "fastcraft:ruby_ore",
       "target": {
         "predicate_type": "minecraft:any_of",
         "rules": [

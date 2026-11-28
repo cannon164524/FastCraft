@@ -25,11 +25,11 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      # The amber mod is built here and embedded into FastCraft.exe, so the launcher can
+      # The ruby mod is built here and embedded into FastCraft.exe, so the launcher can
       # install it with the other mods without downloading anything of its own. A Gradle
       # failure is not allowed to stop the launcher build: the edition still works without
       # it, and the step's log is where the API mismatch is read.
-      - name: Build the amber mod
+      - name: Build the ruby mod
         continue-on-error: true
         shell: pwsh
         run: |
@@ -50,8 +50,8 @@ jobs:
           New-Item -ItemType Directory -Force Assets | Out-Null
           $jar = Get-ChildItem fastcraft-mod/build/libs/*.jar -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -notmatch 'sources' } | Select-Object -First 1
-          if ($jar) { Copy-Item $jar.FullName Assets/fastcraft-amber.jar; Write-Host "Embedding $($jar.Name)" }
-          else { Write-Host "::warning::No amber mod jar was produced." }
+          if ($jar) { Copy-Item $jar.FullName Assets/fastcraft-ruby.jar; Write-Host "Embedding $($jar.Name)" }
+          else { Write-Host "::warning::No ruby mod jar was produced." }
 
       - name: Draw the app icon
         shell: pwsh

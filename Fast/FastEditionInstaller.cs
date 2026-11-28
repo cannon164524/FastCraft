@@ -196,10 +196,10 @@ namespace FastCraft.Fast
             return result;
         }
 
-        private const string EmbeddedModName = "fastcraft-amber.jar";
+        private const string EmbeddedModName = "fastcraft-ruby.jar";
 
         /// <summary>
-        /// Writes FastCraft's own mod — the amber tier between copper and iron — out of the
+        /// Writes FastCraft's own mod — the ruby tier between copper and iron — out of the
         /// launcher's resources into the mods folder. It has no download of its own: the jar is
         /// built with the launcher and carried inside it, so the content works even while the
         /// repository is private. A launcher built without Gradle simply has no resource here.
@@ -209,6 +209,21 @@ namespace FastCraft.Fast
         {
             try
             {
+                // The tier was called amber in the first builds. A leftover jar would register the
+                // same mod id a second time, which the loader refuses, so it is removed first.
+                try
+                {
+                    var legacy = Path.Combine(modsDirectory, "fastcraft-amber.jar");
+                    if (File.Exists(legacy))
+                    {
+                        File.Delete(legacy);
+                        log("[fast] Removed the old amber jar; the tier is ruby now.");
+                    }
+                }
+                catch
+                {
+                }
+
                 var assembly = typeof(FastEditionInstaller).Assembly;
 
                 Stream stream = null;
@@ -221,7 +236,7 @@ namespace FastCraft.Fast
 
                 if (stream == null)
                 {
-                    log("[fast] This build carries no amber mod; the edition works without it.");
+                    log("[fast] This build carries no ruby mod; the edition works without it.");
                     return 0;
                 }
 
@@ -245,7 +260,7 @@ namespace FastCraft.Fast
             }
             catch (Exception ex)
             {
-                log("[fast] The amber mod could not be installed: " + ex.Message);
+                log("[fast] The ruby mod could not be installed: " + ex.Message);
                 return 0;
             }
         }

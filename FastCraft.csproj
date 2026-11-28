@@ -30,9 +30,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The amber mod, built by the workflow and carried inside the launcher so it can be
+    <!-- The ruby mod, built by the workflow and carried inside the launcher so it can be
          installed without a download. Absent in a local build without Gradle. -->
-    <EmbeddedResource Include="Assets/fastcraft-amber.jar" Condition="Exists('Assets/fastcraft-amber.jar')" />
+    <EmbeddedResource Include="Assets/fastcraft-ruby.jar" Condition="Exists('Assets/fastcraft-ruby.jar')" />
   </ItemGroup>
 
 </Project>

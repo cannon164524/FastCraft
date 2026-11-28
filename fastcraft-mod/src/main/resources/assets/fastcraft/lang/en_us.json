@@ -1,10 +1,10 @@
 {
-  "item.fastcraft.raw_amber": "Raw Amber",
-  "item.fastcraft.amber_ingot": "Amber Ingot",
-  "block.fastcraft.amber_ore": "Amber Ore",
-  "item.fastcraft.amber_sword": "Amber Sword",
-  "item.fastcraft.amber_pickaxe": "Amber Pickaxe",
-  "item.fastcraft.amber_axe": "Amber Axe",
-  "item.fastcraft.amber_shovel": "Amber Shovel",
-  "item.fastcraft.amber_hoe": "Amber Hoe"
+  "item.fastcraft.raw_ruby": "Raw Ruby",
+  "item.fastcraft.ruby_ingot": "Ruby",
+  "block.fastcraft.ruby_ore": "Ruby Ore",
+  "item.fastcraft.ruby_sword": "Ruby Sword",
+  "item.fastcraft.ruby_pickaxe": "Ruby Pickaxe",
+  "item.fastcraft.ruby_axe": "Ruby Axe",
+  "item.fastcraft.ruby_shovel": "Ruby Shovel",
+  "item.fastcraft.ruby_hoe": "Ruby Hoe"
 }

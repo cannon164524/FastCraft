@@ -116,36 +116,36 @@ that is supposed to look like a client. The screen class names are read from the
 FancyMenu is a 38 MB download with three dependencies; it arrives with the other mods on the
 first 26.3 launch of the edition.
 
-### The amber tier
+### The ruby tier
 
-`fastcraft-amber.jar` is **FastCraft's own mod**, in `fastcraft-mod/`. The workflow builds it with Gradle
-and embeds it in `FastCraft.exe`, so the launcher writes it into `mods` itself — there is no download of
-its own, which is what lets it work while the repository is private. It adds a tier between copper and iron:
+`fastcraft-ruby.jar` is **FastCraft's own mod**, in `fastcraft-mod/`. The workflow builds it with Gradle and
+embeds it in `FastCraft.exe`, so the launcher writes it into `mods` itself — there is no download of its own,
+which is what lets it work while the repository is private. It adds a tier between copper and iron:
 
 | Thing | Stats |
 | --- | --- |
-| `fastcraft:amber_ore` | 8 veins per chunk, y −16 to 64, stone only |
-| `fastcraft:raw_amber` | drops from the ore, smelts or blasts into an ingot |
-| `fastcraft:amber_ingot` | the repair item and the crafting material |
-| `fastcraft:amber_sword` / `_pickaxe` / `_axe` / `_shovel` / `_hoe` | 220 uses, mining speed 5.5, 1.5 attack damage, level 12 |
+| `fastcraft:ruby_ore` | 8 veins per chunk, y −16 to 64, stone only |
+| `fastcraft:raw_ruby` | drops from the ore, smelts or blasts into a ruby |
+| `fastcraft:ruby_ingot` | the repair item and the crafting material |
+| `fastcraft:ruby_sword` / `_pickaxe` / `_axe` / `_shovel` / `_hoe` | 220 uses, mining speed 5.5, 1.5 attack damage, level 12 |
 
-Copper is 190 uses, speed 5, damage 1; iron is 250, speed 6, damage 2. The five tools are crafted in the
-usual shapes and the ore is mined with a stone pickaxe or better.
+Copper is 190 uses, speed 5, damage 1; iron is 250, speed 6, damage 2. The five tools are crafted in the usual
+shapes and the ore is mined with a stone pickaxe or better.
 
-It sits in the creative inventory beside **Ingredients** (raw amber and the ingot), **Natural Blocks** (the ore)
+It sits in the creative inventory beside **Ingredients** (raw ruby and the ruby), **Natural Blocks** (the ore)
 and **Tools & Utilities** (the five tools). The ore replaces **stone only**, between y −16 and 64 — so in caves
-it is found in the stone band from about y 0 up to 64; the caves below y 0 are deepslate, and a deepslate amber
+it is found in the stone band from about y 0 up to 64; the caves below y 0 are deepslate, and a deepslate ruby
 ore is not part of the tier yet.
 
-The art is drawn on the same **16×16 pixel grid** as the game's own textures: the vanilla tool silhouettes and
-two-tone bevels, in amber yellow and honey brown instead of copper's muted orange, so the set looks like
-Minecraft items rather than a different game's icons. Those textures, their models and the blockstate replace
-the copper placeholders the mod ships.
+The art is the game's own. The launcher recolours vanilla textures to dark red and ships them in the pack: an
+iron sword with ruby instead of steel, a diamond ore with rubies instead of diamonds, raw iron as raw ruby. The
+pixels, the outlines and the shading stay Mojang's and only the hue changes, which is why the set still reads as
+Minecraft items. `Fast/VanillaRecolour.cs` decides per pixel — the desaturated metal of an iron tool becomes ruby
+while its wooden handle stays wood, and an ore's coloured gems become ruby while the stone stays stone.
 
 Honest state: this is the first Java code in the project, so the 26.3 API and the Gradle/Loom version are
 resolved by the workflow from Fabric's and Modrinth's live data instead of being hard-coded, and the mod build
-step is allowed to fail without stopping the launcher release — the log names the call that moved. The ore's and
-the tools' textures and names come from the resource pack in the build after the mod first compiles.
+step is allowed to fail without stopping the launcher release — the log names the call that moved.
 
 
 

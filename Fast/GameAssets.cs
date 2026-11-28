@@ -107,6 +107,28 @@ namespace FastCraft.Fast
         }
 
         /// <summary>
+        /// A texture of the game's own resources, byte for byte. Used to recolour vanilla art
+        /// into FastCraft's colours, so nothing has to be drawn from scratch.
+        /// </summary>
+        public bool TryRead(string assetPath, out byte[] bytes)
+        {
+            bytes = null;
+
+            string file;
+            if (!_objects.TryGetValue(assetPath, out file) || !File.Exists(file)) return false;
+
+            try
+            {
+                bytes = File.ReadAllBytes(file);
+                return bytes.Length > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// The resource pack format of this exact version as "major.minor", from the
         /// "version.json" the client jar carries. Since 25w31a that object is
         /// pack_version.resource = { major, minor } with string values; older jars carry a

@@ -25,7 +25,7 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.material.MapColor;
 
 /**
- * The FastCraft amber tier. 26.3 is unobfuscated, so these are the game's own names:
+ * The FastCraft ruby tier. 26.3 is unobfuscated, so these are the game's own names:
  * Identifier (renamed from ResourceLocation in 25w45a), a block and items registered with a
  * ResourceKey, every item given its id through Item.Properties#setId, and five tools built
  * with the properties' own sword/pickaxe/axe/shovel/hoe factories.
@@ -36,60 +36,60 @@ public class FastCraftMod implements ModInitializer
 {
     public static final String ID = "fastcraft";
 
-    private static final TagKey<Item> REPAIRS_AMBER =
-        TagKey.create(BuiltInRegistries.ITEM.key(), id("repairs_amber"));
+    private static final TagKey<Item> REPAIRS_RUBY =
+        TagKey.create(BuiltInRegistries.ITEM.key(), id("repairs_ruby"));
 
     // Between copper (190 uses, speed 5, +1 damage) and iron (250, 6, +2).
-    public static final ToolMaterial AMBER = new ToolMaterial(
-        BlockTags.INCORRECT_FOR_IRON_TOOL, 220, 5.5F, 1.5F, 12, REPAIRS_AMBER);
+    public static final ToolMaterial RUBY = new ToolMaterial(
+        BlockTags.INCORRECT_FOR_IRON_TOOL, 220, 5.5F, 1.5F, 12, REPAIRS_RUBY);
 
-    public static final Item RAW_AMBER = item("raw_amber", new Item.Properties());
-    public static final Item AMBER_INGOT = item("amber_ingot", new Item.Properties());
+    public static final Item RAW_RUBY = item("raw_ruby", new Item.Properties());
+    public static final Item RUBY_INGOT = item("ruby_ingot", new Item.Properties());
 
-    private static final ResourceKey<Block> AMBER_ORE_KEY =
-        ResourceKey.create(Registries.BLOCK, id("amber_ore"));
+    private static final ResourceKey<Block> RUBY_ORE_KEY =
+        ResourceKey.create(Registries.BLOCK, id("ruby_ore"));
 
-    private static final Block AMBER_ORE = new Block(BlockBehaviour.Properties.of()
-        .setId(AMBER_ORE_KEY)
-        .mapColor(MapColor.COLOR_ORANGE)
+    private static final Block RUBY_ORE = new Block(BlockBehaviour.Properties.of()
+        .setId(RUBY_ORE_KEY)
+        .mapColor(MapColor.COLOR_RED)
         .requiresCorrectToolForDrops()
         .strength(3.0F, 3.0F)
         .sound(SoundType.STONE));
 
-    public static final Item AMBER_ORE_ITEM = blockItem("amber_ore", AMBER_ORE);
+    public static final Item RUBY_ORE_ITEM = blockItem("ruby_ore", RUBY_ORE);
 
-    public static final Item AMBER_SWORD = tool("amber_sword", properties -> properties.sword(AMBER, 3.0F, -2.4F));
-    public static final Item AMBER_PICKAXE = tool("amber_pickaxe", properties -> properties.pickaxe(AMBER, 1.0F, -2.8F));
-    public static final Item AMBER_AXE = tool("amber_axe", properties -> properties.axe(AMBER, 5.5F, -3.0F));
-    public static final Item AMBER_SHOVEL = tool("amber_shovel", properties -> properties.shovel(AMBER, 1.5F, -3.0F));
-    public static final Item AMBER_HOE = tool("amber_hoe", properties -> properties.hoe(AMBER, -2.0F, 0.0F));
+    public static final Item RUBY_SWORD = tool("ruby_sword", properties -> properties.sword(RUBY, 3.0F, -2.4F));
+    public static final Item RUBY_PICKAXE = tool("ruby_pickaxe", properties -> properties.pickaxe(RUBY, 1.0F, -2.8F));
+    public static final Item RUBY_AXE = tool("ruby_axe", properties -> properties.axe(RUBY, 5.5F, -3.0F));
+    public static final Item RUBY_SHOVEL = tool("ruby_shovel", properties -> properties.shovel(RUBY, 1.5F, -3.0F));
+    public static final Item RUBY_HOE = tool("ruby_hoe", properties -> properties.hoe(RUBY, -2.0F, 0.0F));
 
-    private static final ResourceKey<PlacedFeature> AMBER_ORE_PLACED =
-        ResourceKey.create(Registries.PLACED_FEATURE, id("amber_ore"));
+    private static final ResourceKey<PlacedFeature> RUBY_ORE_PLACED =
+        ResourceKey.create(Registries.PLACED_FEATURE, id("ruby_ore"));
 
     @Override
     public void onInitialize()
     {
-        Registry.register(BuiltInRegistries.BLOCK, AMBER_ORE_KEY, AMBER_ORE);
+        Registry.register(BuiltInRegistries.BLOCK, RUBY_ORE_KEY, RUBY_ORE);
 
         BiomeModifications.addFeature(BiomeSelectors.foundInOverworld(),
-            GenerationStep.Decoration.UNDERGROUND_ORES, AMBER_ORE_PLACED);
+            GenerationStep.Decoration.UNDERGROUND_ORES, RUBY_ORE_PLACED);
 
         // Findable in the creative inventory, beside the material each thing belongs to.
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.INGREDIENTS).register(output ->
         {
-            output.accept(RAW_AMBER);
-            output.accept(AMBER_INGOT);
+            output.accept(RAW_RUBY);
+            output.accept(RUBY_INGOT);
         });
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.NATURAL_BLOCKS).register(output ->
-            output.accept(AMBER_ORE_ITEM));
+            output.accept(RUBY_ORE_ITEM));
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(output ->
         {
-            output.accept(AMBER_SWORD);
-            output.accept(AMBER_PICKAXE);
-            output.accept(AMBER_AXE);
-            output.accept(AMBER_SHOVEL);
-            output.accept(AMBER_HOE);
+            output.accept(RUBY_SWORD);
+            output.accept(RUBY_PICKAXE);
+            output.accept(RUBY_AXE);
+            output.accept(RUBY_SHOVEL);
+            output.accept(RUBY_HOE);
         });
     }
 

@@ -2,7 +2,7 @@
   "type": "minecraft:crafting_shaped",
   "category": "equipment",
   "key": {
-    "X": "fastcraft:amber_ingot",
+    "X": "fastcraft:ruby_ingot",
     "S": "minecraft:stick"
   },
   "pattern": [
@@ -11,7 +11,7 @@
     " S "
   ],
   "result": {
-    "id": "fastcraft:amber_pickaxe",
+    "id": "fastcraft:ruby_pickaxe",
     "count": 1
   }
 }
